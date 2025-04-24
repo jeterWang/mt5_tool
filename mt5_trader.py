@@ -7,32 +7,28 @@ import os
 from dotenv import load_dotenv
 
 class MT5Trader:
-    def __init__(self, login: int, password: str, server: str):
-        """
-        初始化MT5交易类
-        :param login: MT5账号
-        :param password: MT5密码
-        :param server: MT5服务器
-        """
-        self.login = login
-        self.password = password
-        self.server = server
+    def __init__(self):
+        """初始化交易者"""
         self.connected = False
-        self.connect()
-
+        
     def connect(self) -> bool:
-        """连接到MT5平台"""
-        if not mt5.initialize():
-            print(f"初始化失败: {mt5.last_error()}")
+        """连接到MT5"""
+        try:
+            if not mt5.initialize():
+                print("MT5初始化失败")
+                return False
+                
+            # 检查是否已经登录
+            account_info = mt5.account_info()
+            if account_info is None:
+                print("未检测到MT5登录账号，请先在MT5中登录")
+                return False
+                
+            self.connected = True
+            return True
+        except Exception as e:
+            print(f"连接MT5出错: {str(e)}")
             return False
-
-        if not mt5.login(login=self.login, password=self.password, server=self.server):
-            print(f"登录失败: {mt5.last_error()}")
-            return False
-
-        self.connected = True
-        print("MT5连接成功")
-        return True
 
     def disconnect(self):
         """断开MT5连接"""
@@ -303,17 +299,39 @@ class MT5Trader:
             print(f"撤销订单出错：{str(e)}")
             return False
 
+    def is_connected(self) -> bool:
+        """检查是否已连接到MT5"""
+        return self.connected
+
+    def get_account_info(self):
+        """获取账户信息"""
+        try:
+            account_info = mt5.account_info()
+            if account_info is None:
+                return None
+            return {
+                "balance": account_info.balance,
+                "equity": account_info.equity,
+                "margin": account_info.margin,
+                "free_margin": account_info.margin_free,
+                "margin_level": account_info.margin_level
+            }
+        except Exception as e:
+            print(f"获取账户信息失败: {str(e)}")
+            return None
+
 # 使用示例
 if __name__ == "__main__":
     # 加载环境变量
     load_dotenv()
     
     # 创建交易实例
-    trader = MT5Trader(
-        login=int(os.getenv("MT5_LOGIN", "123456")),
-        password=os.getenv("MT5_PASSWORD", "password"),
-        server=os.getenv("MT5_SERVER", "server")
-    )
+    trader = MT5Trader()
+
+    # 连接到MT5
+    if not trader.connect():
+        print("无法连接到MT5")
+        exit(1)
 
     # 示例1：简单下单（带止盈止损）
     order1 = trader.place_order_with_tp_sl(

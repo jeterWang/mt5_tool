@@ -13,13 +13,15 @@ from dotenv import load_dotenv
 import config
 import MetaTrader5 as mt5
 from datetime import datetime
+from database import TradeDatabase
 
 class MT5GUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.trader = None
+        # 初始化数据库
+        self.db = TradeDatabase()
         self.init_ui()
-        self.load_config()
         self.setup_timer()
         # 添加状态栏
         self.status_bar = QStatusBar()
@@ -31,7 +33,10 @@ class MT5GUI(QMainWindow):
         
         # 设置窗口图标
         self.setWindowIcon(QIcon("icon.svg"))
-
+        
+        # 初始化交易次数显示
+        self.update_trade_count_display()
+        
     def init_ui(self):
         """初始化UI界面"""
         self.setWindowTitle('MT5一键交易系统')
@@ -41,6 +46,25 @@ class MT5GUI(QMainWindow):
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         layout = QVBoxLayout(main_widget)
+
+        # 添加账户信息和交易次数显示
+        account_info_layout = QHBoxLayout()
+        self.balance_label = QLabel("余额: 0.00")
+        self.equity_label = QLabel("净值: 0.00")
+        self.margin_label = QLabel("保证金: 0.00")
+        self.free_margin_label = QLabel("可用保证金: 0.00")
+        self.margin_level_label = QLabel("保证金水平: 0%")
+        self.trade_count_label = QLabel(f"今日剩余交易次数: {config.DAILY_TRADE_LIMIT}")
+        self.trade_count_label.setStyleSheet("QLabel { color: blue; font-weight: bold; }")
+        
+        account_info_layout.addWidget(self.balance_label)
+        account_info_layout.addWidget(self.equity_label)
+        account_info_layout.addWidget(self.margin_label)
+        account_info_layout.addWidget(self.free_margin_label)
+        account_info_layout.addWidget(self.margin_level_label)
+        account_info_layout.addWidget(self.trade_count_label)
+        
+        layout.addLayout(account_info_layout)
 
         # 添加倒计时显示
         countdown_layout = QHBoxLayout()
@@ -94,13 +118,13 @@ class MT5GUI(QMainWindow):
         self.volume1 = QDoubleSpinBox()
         self.volume1.setRange(0.01, 100)
         self.volume1.setSingleStep(0.01)
-        self.volume1.setValue(0.1)
+        self.volume1.setValue(0.2)
         self.sl_points1 = QSpinBox()
         self.sl_points1.setRange(0, 100000)
         self.sl_points1.setValue(1500)
         self.tp_points1 = QSpinBox()
         self.tp_points1.setRange(0, 100000)
-        self.tp_points1.setValue(1000)
+        self.tp_points1.setValue(0)
         order1_layout.addWidget(QLabel("手数:"))
         order1_layout.addWidget(self.volume1)
         order1_layout.addWidget(QLabel("止损点数:"))
@@ -115,13 +139,13 @@ class MT5GUI(QMainWindow):
         self.volume2 = QDoubleSpinBox()
         self.volume2.setRange(0.01, 100)
         self.volume2.setSingleStep(0.01)
-        self.volume2.setValue(0.1)
+        self.volume2.setValue(0.2)
         self.sl_points2 = QSpinBox()
         self.sl_points2.setRange(0, 100000)
         self.sl_points2.setValue(1500)
         self.tp_points2 = QSpinBox()
         self.tp_points2.setRange(0, 100000)
-        self.tp_points2.setValue(1000)
+        self.tp_points2.setValue(0)
         order2_layout.addWidget(QLabel("手数:"))
         order2_layout.addWidget(self.volume2)
         order2_layout.addWidget(QLabel("止损点数:"))
@@ -136,7 +160,7 @@ class MT5GUI(QMainWindow):
         self.volume3 = QDoubleSpinBox()
         self.volume3.setRange(0.01, 100)
         self.volume3.setSingleStep(0.01)
-        self.volume3.setValue(0.1)
+        self.volume3.setValue(0.2)
         self.sl_points3 = QSpinBox()
         self.sl_points3.setRange(0, 100000)
         self.sl_points3.setValue(1500)
@@ -150,6 +174,27 @@ class MT5GUI(QMainWindow):
         order3_layout.addWidget(QLabel("止盈点数:"))
         order3_layout.addWidget(self.tp_points3)
         batch_layout.addLayout(order3_layout)
+
+        # 第四单设置
+        order4_layout = QHBoxLayout()
+        order4_layout.addWidget(QLabel("第四单:"))
+        self.volume4 = QDoubleSpinBox()
+        self.volume4.setRange(0.01, 100)
+        self.volume4.setSingleStep(0.01)
+        self.volume4.setValue(0.2)
+        self.sl_points4 = QSpinBox()
+        self.sl_points4.setRange(0, 100000)
+        self.sl_points4.setValue(1500)
+        self.tp_points4 = QSpinBox()
+        self.tp_points4.setRange(0, 100000)
+        self.tp_points4.setValue(0)
+        order4_layout.addWidget(QLabel("手数:"))
+        order4_layout.addWidget(self.volume4)
+        order4_layout.addWidget(QLabel("止损点数:"))
+        order4_layout.addWidget(self.sl_points4)
+        order4_layout.addWidget(QLabel("止盈点数:"))
+        order4_layout.addWidget(self.tp_points4)
+        batch_layout.addLayout(order4_layout)
 
         batch_group.setLayout(batch_layout)
         trading_layout.addWidget(batch_group)
@@ -311,9 +356,7 @@ class MT5GUI(QMainWindow):
 
     def load_config(self):
         """加载配置文件"""
-        self.login = config.username
-        self.password = config.password
-        self.server = config.server
+        pass  # 不再需要加载账号信息
 
     def setup_timer(self):
         """设置定时器更新持仓信息和倒计时"""
@@ -327,14 +370,32 @@ class MT5GUI(QMainWindow):
         self.countdown_timer.timeout.connect(self.update_countdown)
         self.countdown_timer.start(1000)  # 每秒更新一次
 
+        # 添加账户信息更新定时器
+        self.account_timer = QTimer()
+        self.account_timer.timeout.connect(self.update_account_info)
+        self.account_timer.start(5000)  # 每5秒更新一次账户信息
+
     def connect_mt5(self):
-        """连接到MT5"""
+        """连接MT5"""
         try:
-            # 确保账号是整数类型
-            login = int(self.login) if isinstance(self.login, str) else self.login
-            self.trader = MT5Trader(login, self.password, self.server)
-            if self.trader.connected:
-                self.status_bar.showMessage("MT5连接成功！")
+            if self.trader is None:
+                # 检查是否已经登录
+                if not mt5.initialize():
+                    self.status_bar.showMessage("MT5初始化失败！")
+                    return
+                    
+                # 获取当前登录的账号信息
+                account_info = mt5.account_info()
+                if account_info is None:
+                    self.status_bar.showMessage("未检测到MT5登录账号，请先在MT5中登录！")
+                    return
+                    
+                self.trader = MT5Trader()
+                self.trader.connected = True
+                self.status_bar.showMessage(f"MT5连接成功！当前账号：{account_info.login}")
+                self.update_account_info()  # 更新账户信息
+                
+                # 启用按钮
                 self.place_batch_buy_btn.setEnabled(True)
                 self.place_batch_sell_btn.setEnabled(True)
                 self.place_breakout_high_btn.setEnabled(True)
@@ -342,19 +403,65 @@ class MT5GUI(QMainWindow):
                 self.cancel_all_pending_btn.setEnabled(True)
                 self.close_all_btn.setEnabled(True)
             else:
-                self.status_bar.showMessage("MT5连接失败！")
+                self.status_bar.showMessage("MT5已经连接！")
         except Exception as e:
-            self.status_bar.showMessage(f"连接出错：{str(e)}")
+            self.status_bar.showMessage(f"连接MT5出错：{str(e)}")
+
+    def update_trade_count_display(self):
+        """更新交易次数显示"""
+        count = self.db.get_today_count()
+        remaining = max(0, config.DAILY_TRADE_LIMIT - count)
+        self.trade_count_label.setText(f"今日剩余交易次数: {remaining}")
+        if remaining == 0:
+            self.trade_count_label.setStyleSheet("QLabel { color: red; font-weight: bold; }")
+        else:
+            self.trade_count_label.setStyleSheet("QLabel { color: blue; font-weight: bold; }")
+            
+    def check_trade_limit(self) -> bool:
+        """检查是否超过每日交易限制"""
+        count = self.db.get_today_count()
+        if count >= config.DAILY_TRADE_LIMIT:
+            self.status_bar.showMessage("已达到每日交易次数限制！")
+            return False
+        return True
+        
+    def increment_trade_count(self):
+        """增加交易次数计数"""
+        if self.db.increment_count():
+            self.update_trade_count_display()
 
     def place_batch_orders(self, order_type: str):
         """批量下单"""
         try:
+            # 检查交易次数限制
+            if not self.check_trade_limit():
+                return
+                
+            # 检查MT5连接状态
+            if not self.trader or not self.trader.is_connected():
+                self.status_bar.showMessage("MT5未连接，请检查连接状态！")
+                return
+                
             # 检查MT5自动交易是否启用
             if not mt5.terminal_info().trade_allowed:
                 self.status_bar.showMessage("请在MT5平台中启用自动交易！")
                 return
                 
+            # 检查账户状态
+            account_info = mt5.account_info()
+            if account_info is None:
+                self.status_bar.showMessage("无法获取账户信息！")
+                return
+                
+            # 检查可用保证金
+            if account_info.margin_free <= 0:
+                self.status_bar.showMessage("可用保证金不足！")
+                return
+                
             symbol = self.symbol_input.currentText()
+            
+            # 显示正在下单的提示
+            self.status_bar.showMessage(f"正在执行批量{order_type}单...")
             
             # 下第一单
             order1 = self.trader.place_order_with_tp_sl(
@@ -366,6 +473,10 @@ class MT5GUI(QMainWindow):
                 comment="批量下单1"
             )
             
+            if not order1:
+                self.status_bar.showMessage("第一单下单失败！")
+                return
+            
             # 下第二单
             order2 = self.trader.place_order_with_tp_sl(
                 symbol=symbol,
@@ -376,6 +487,10 @@ class MT5GUI(QMainWindow):
                 comment="批量下单2"
             )
             
+            if not order2:
+                self.status_bar.showMessage("第二单下单失败！")
+                return
+
             # 下第三单
             order3 = self.trader.place_order_with_tp_sl(
                 symbol=symbol,
@@ -386,16 +501,44 @@ class MT5GUI(QMainWindow):
                 comment="批量下单3"
             )
             
-            if order1 and order2 and order3:
-                self.status_bar.showMessage(f"批量{order_type}单成功！订单号：{order1}, {order2}, {order3}")
+            if not order3:
+                self.status_bar.showMessage("第三单下单失败！")
+                return
+
+            # 下第四单
+            order4 = self.trader.place_order_with_tp_sl(
+                symbol=symbol,
+                order_type=order_type,
+                volume=self.volume4.value(),
+                sl_points=self.sl_points4.value(),
+                tp_points=self.tp_points4.value(),
+                comment="批量下单4"
+            )
+            
+            if order1 and order2 and order3 and order4:
+                # 增加交易次数计数
+                self.increment_trade_count()
+                self.status_bar.showMessage(f"批量{order_type}单成功！订单号：{order1}, {order2}, {order3}, {order4}")
+                # 播放提示音
+                winsound.Beep(1000, 200)
             else:
                 self.status_bar.showMessage(f"批量{order_type}单失败！")
         except Exception as e:
             self.status_bar.showMessage(f"批量下单出错：{str(e)}")
+            print(f"下单错误详情：{str(e)}")
 
     def place_breakout_order(self, breakout_type: str):
         """挂突破单"""
         try:
+            # 检查交易次数限制
+            if not self.check_trade_limit():
+                return
+                
+            # 检查MT5连接状态
+            if not self.trader or not self.trader.is_connected():
+                self.status_bar.showMessage("MT5未连接，请检查连接状态！")
+                return
+                
             # 检查MT5自动交易是否启用
             if not mt5.terminal_info().trade_allowed:
                 self.status_bar.showMessage("请在MT5平台中启用自动交易！")
@@ -456,12 +599,28 @@ class MT5GUI(QMainWindow):
                 comment=f"{comment_prefix}3"
             )
             
-            if order1 and order2 and order3:
-                self.status_bar.showMessage(f"{comment_prefix}成功！订单号：{order1}, {order2}, {order3}，价格：{price}")
+            # 下第四单
+            order4 = self.trader.place_order_with_tp_sl(
+                symbol=symbol,
+                order_type=order_type,
+                volume=self.volume4.value(),
+                sl_points=self.sl_points4.value(),
+                tp_points=self.tp_points4.value(),
+                price=price,
+                comment=f"{comment_prefix}4"
+            )
+            
+            if order1 and order2 and order3 and order4:
+                # 增加交易次数计数
+                self.increment_trade_count()
+                self.status_bar.showMessage(f"{comment_prefix}成功！订单号：{order1}, {order2}, {order3}, {order4}，价格：{price}")
+                # 播放提示音
+                winsound.Beep(1000, 200)
             else:
                 self.status_bar.showMessage(f"{comment_prefix}失败！")
         except Exception as e:
             self.status_bar.showMessage(f"挂突破单出错：{str(e)}")
+            print(f"下单错误详情：{str(e)}")
 
     def get_timeframe(self, timeframe: str) -> int:
         """将时间周期字符串转换为MT5的时间周期常量"""
@@ -598,15 +757,15 @@ class MT5GUI(QMainWindow):
         symbol_params = config.DEFAULT_PARAMS[symbol]
         
         # 设置手数范围
-        for volume_input in [self.volume1, self.volume2, self.volume3]:
+        for volume_input in [self.volume1, self.volume2, self.volume3, self.volume4]:
             volume_input.setRange(symbol_params["min_volume"], symbol_params["max_volume"])
             volume_input.setSingleStep(symbol_params["volume_step"])
         
         # 设置止损止盈范围
-        for sl_input in [self.sl_points1, self.sl_points2, self.sl_points3]:
+        for sl_input in [self.sl_points1, self.sl_points2, self.sl_points3, self.sl_points4]:
             sl_input.setRange(symbol_params["min_sl_points"], symbol_params["max_sl_points"])
             
-        for tp_input in [self.tp_points1, self.tp_points2, self.tp_points3]:
+        for tp_input in [self.tp_points1, self.tp_points2, self.tp_points3, self.tp_points4]:
             tp_input.setRange(symbol_params["min_tp_points"], symbol_params["max_tp_points"])
         
         # 设置默认值
@@ -621,6 +780,10 @@ class MT5GUI(QMainWindow):
         self.volume3.setValue(config.BATCH_ORDER_DEFAULTS["order3"]["volume"])
         self.sl_points3.setValue(config.BATCH_ORDER_DEFAULTS["order3"]["sl_points"])
         self.tp_points3.setValue(config.BATCH_ORDER_DEFAULTS["order3"]["tp_points"])
+        
+        self.volume4.setValue(config.BATCH_ORDER_DEFAULTS["order4"]["volume"])
+        self.sl_points4.setValue(config.BATCH_ORDER_DEFAULTS["order4"]["sl_points"])
+        self.tp_points4.setValue(config.BATCH_ORDER_DEFAULTS["order4"]["tp_points"])
 
     def cancel_all_pending_orders(self):
         """撤销所有挂单"""
@@ -652,6 +815,18 @@ class MT5GUI(QMainWindow):
         else:
             self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
         self.show()  # 重新显示窗口以应用新的窗口标志
+
+    def update_account_info(self):
+        """更新账户信息"""
+        if self.trader and self.trader.is_connected():
+            account_info = self.trader.get_account_info()
+            if account_info:
+                self.balance_label.setText(f"余额: {account_info['balance']:.2f}")
+                self.equity_label.setText(f"净值: {account_info['equity']:.2f}")
+                self.margin_label.setText(f"保证金: {account_info['margin']:.2f}")
+                self.free_margin_label.setText(f"可用保证金: {account_info['free_margin']:.2f}")
+                self.margin_level_label.setText(f"保证金水平: {account_info['margin_level']:.2f}%")
+                
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

@@ -1,108 +1,94 @@
-# MT5一键下单脚本
+# MT5一键交易工具
 
-这是一个用于MetaTrader 5的一键下单脚本，支持自动止盈止损和分批止盈功能。
+这是一个基于MetaTrader 5 (MT5) API的自动化交易工具，提供了简单易用的图形界面，支持多种交易功能。
 
-## 功能特点
+## 主要功能
 
-- 一键下单（支持市价单和限价单）
-- 自动设置止盈止损
-- 支持分批止盈
-- 支持查看持仓信息
-- 支持手动平仓
+- 🚀 一键下单功能
+  - 支持市价单和挂单
+  - 可同时下多个订单
+  - 每个订单可独立设置止盈止损
+  - 支持批量设置交易量
 
-## 安装依赖
+- 📊 K线周期监控
+  - 支持多个时间周期（M1, M5, M15, M30, H1, H4）
+  - 自动计算收盘倒计时
+  - 收盘提醒功能
 
-使用uv安装依赖包：
+- 💼 订单管理
+  - 一键平仓功能
+  - 一键撤销挂单
+  - 突破单功能（支持高点和低点突破）
 
+- ⚙️ 配置灵活
+  - 支持多个交易品种（默认 XAUUSDm, XAGUSDm）
+  - 可自定义默认参数
+  - 支持环境变量配置
+
+## 安装说明
+
+1. 确保已安装Python 3.11或更低版本（MetaTrader5包目前不支持Python 3.13）
+
+2. 克隆仓库：
+```bash
+git clone https://github.com/jeterWang/mt5_tool.git
+cd mt5_tool
+```
+
+3. 创建并激活虚拟环境：
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# 或
+venv\Scripts\activate  # Windows
+```
+
+4. 安装依赖：
 ```bash
 uv pip install -r requirements.txt
 ```
 
-## 配置
-
-1. 在项目根目录创建`.env`文件
-2. 添加以下配置信息：
-
+5. 配置环境变量：
+   - 复制`.env.example`为`.env`
+   - 在`.env`中填入您的MT5账号信息：
 ```
-MT5_LOGIN=你的MT5账号
-MT5_PASSWORD=你的MT5密码
-MT5_SERVER=你的MT5服务器
+MT5_USERNAME=您的账号
+MT5_PASSWORD=您的密码
+MT5_SERVER=您的服务器
 ```
 
-## 使用示例
+## 使用说明
 
-### 1. 简单下单（带止盈止损）
+1. 确保MT5客户端已登录并启用了自动交易
 
-```python
-from mt5_trader import MT5Trader
-
-# 创建交易实例
-trader = MT5Trader(
-    login=123456,
-    password="your_password",
-    server="your_server"
-)
-
-# 下单（0.1手EURUSD，止损50点，止盈100点）
-order = trader.place_order_with_tp_sl(
-    symbol="EURUSD",
-    order_type="buy",
-    volume=0.1,
-    sl_points=50,
-    tp_points=100,
-    comment="测试订单"
-)
+2. 运行程序：
+```bash
+python mt5_gui.py
 ```
 
-### 2. 分批止盈下单
-
-```python
-# 设置分批止盈
-tp_levels = [
-    {"points": 30, "volume": 0.03},  # 30点止盈，平仓0.03手
-    {"points": 60, "volume": 0.03},  # 60点止盈，平仓0.03手
-    {"points": 100, "volume": 0.04}  # 100点止盈，平仓0.04手
-]
-
-# 下单（0.1手EURUSD，止损50点，分批止盈）
-order = trader.place_order_with_partial_tp(
-    symbol="EURUSD",
-    order_type="buy",
-    volume=0.1,
-    sl_points=50,
-    tp_levels=tp_levels,
-    comment="分批止盈测试"
-)
-```
-
-### 3. 查看持仓信息
-
-```python
-# 获取持仓信息
-position = trader.get_position(ticket=123456)
-```
-
-### 4. 手动平仓
-
-```python
-# 平仓
-trader.close_position(ticket=123456)
-```
+3. 主要功能说明：
+   - 选择交易品种和K线周期
+   - 设置交易量、止盈止损点数
+   - 使用一键下单功能进行交易
+   - 使用突破单功能设置自动突破订单
+   - 使用一键平仓功能快速关闭所有持仓
+   - 使用撤单功能取消所有挂单
 
 ## 注意事项
 
-1. 使用前请确保MT5平台已经登录
-2. 确保账户有足够的保证金
-3. 分批止盈的总量不能超过订单总量
-4. 建议在实盘交易前先在模拟账户测试
+- 使用前请确保了解交易风险
+- 建议在模拟账户中充分测试
+- 确保网络连接稳定
+- 定期检查MT5客户端状态
 
-## 错误处理
+## 许可证
 
-脚本会处理常见的错误情况，如：
-- 连接失败
-- 登录失败
-- 下单失败
-- 交易品种不存在
-- 参数错误
+MIT License
 
-所有错误都会通过打印信息提示用户。 
+## 作者
+
+jeterWang
+
+## 贡献
+
+欢迎提交Issue和Pull Request！ 
