@@ -23,6 +23,15 @@ class TradeDatabase:
                     count INTEGER DEFAULT 0
                 )
             ''')
+            # 新增风控事件表
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS risk_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT,
+                    event_type TEXT,
+                    detail TEXT
+                )
+            ''')
             
             conn.commit()
             conn.close()
@@ -100,4 +109,18 @@ class TradeDatabase:
             
         except Exception as e:
             print(f"获取交易历史出错：{str(e)}")
-            return [] 
+            return []
+    
+    def record_risk_event(self, event_type: str, detail: str = ""):
+        """记录风控事件"""
+        try:
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO risk_events (date, event_type, detail) VALUES (?, ?, ?)
+            ''', (now, event_type, detail))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"记录风控事件出错：{str(e)}") 

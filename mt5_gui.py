@@ -11,6 +11,7 @@ from mt5_trader import MT5Trader
 import os
 from dotenv import load_dotenv
 import importlib.util
+import pandas as pd
 
 def resource_path(filename):
     if getattr(sys, 'frozen', False):
@@ -82,15 +83,24 @@ class MT5GUI(QMainWindow):
         self.margin_level_label = QLabel("保证金水平: 0%")
         self.trade_count_label = QLabel(f"今日剩余交易次数: {config.DAILY_TRADE_LIMIT}")
         self.trade_count_label.setStyleSheet("QLabel { color: blue; font-weight: bold; }")
-        
         account_info_layout.addWidget(self.balance_label)
         account_info_layout.addWidget(self.equity_label)
         account_info_layout.addWidget(self.margin_label)
         account_info_layout.addWidget(self.free_margin_label)
         account_info_layout.addWidget(self.margin_level_label)
         account_info_layout.addWidget(self.trade_count_label)
-        
         layout.addLayout(account_info_layout)
+
+        # 新增盈亏信息行
+        pnl_info_layout = QHBoxLayout()
+        self.realized_label = QLabel("今日已实现盈亏: 0.00")
+        self.unrealized_label = QLabel("当前浮动盈亏: 0.00")
+        self.total_pnl_label = QLabel("日内总盈亏: 0.00")
+        pnl_info_layout.addWidget(self.realized_label)
+        pnl_info_layout.addWidget(self.unrealized_label)
+        pnl_info_layout.addWidget(self.total_pnl_label)
+        pnl_info_layout.addStretch()
+        layout.addLayout(pnl_info_layout)
 
         # 添加倒计时显示
         countdown_layout = QHBoxLayout()
@@ -404,7 +414,13 @@ class MT5GUI(QMainWindow):
         # 每分钟自动同步所有平仓单到excel
         self.closed_trade_timer = QTimer()
         self.closed_trade_timer.timeout.connect(self.sync_closed_trades)
-        self.closed_trade_timer.start(60 * 1000)  # 每分钟执行一次
+        # self.closed_trade_timer.start(60 * 1000)  # 每分钟执行一次
+        self.closed_trade_timer.start(5 * 1000)  # 每5s执行一次
+
+        # 新增盈亏信息定时器
+        self.pnl_timer = QTimer()
+        self.pnl_timer.timeout.connect(self.update_daily_pnl_info)
+        self.pnl_timer.start(2000)  # 每2秒刷新一次
 
     def connect_mt5(self):
         """连接MT5"""
@@ -462,35 +478,32 @@ class MT5GUI(QMainWindow):
             self.update_trade_count_display()
 
     def place_batch_orders(self, order_type: str):
-        """批量下单"""
+        """批量下单，增加风控检查"""
         try:
+            # 检查风控
+            if not self.check_daily_loss_limit():
+                return
             # 检查交易次数限制
             if not self.check_trade_limit():
                 return
-                
             # 检查MT5连接状态
             if not self.trader or not self.trader.is_connected():
                 self.status_bar.showMessage("MT5未连接，请检查连接状态！")
                 return
-                
             # 检查MT5自动交易是否启用
             if not mt5.terminal_info().trade_allowed:
                 self.status_bar.showMessage("请在MT5平台中启用自动交易！")
                 return
-                
             # 检查账户状态
             account_info = mt5.account_info()
             if account_info is None:
                 self.status_bar.showMessage("无法获取账户信息！")
                 return
-                
             # 检查可用保证金
             if account_info.margin_free <= 0:
                 self.status_bar.showMessage("可用保证金不足！")
                 return
-                
             symbol = self.symbol_input.currentText()
-            
             # 显示正在下单的提示
             self.status_bar.showMessage(f"正在执行批量{order_type}单...")
             
@@ -696,15 +709,16 @@ class MT5GUI(QMainWindow):
             self.status_bar.showMessage(f"一键平仓出错：{str(e)}")
 
     def update_positions(self):
-        """更新持仓信息"""
+        """更新持仓信息，并检查风控"""
         if not self.trader or not self.trader.connected:
             return
-            
+        # 风控检查
+        if not self.check_daily_loss_limit():
+            return
         try:
             positions = self.trader.get_all_positions()
             if positions is None:
                 return
-                
             self.positions_table.setRowCount(len(positions))
             for i, position in enumerate(positions):
                 self.positions_table.setItem(i, 0, QTableWidgetItem(str(position['ticket'])))
@@ -713,7 +727,6 @@ class MT5GUI(QMainWindow):
                 self.positions_table.setItem(i, 3, QTableWidgetItem(str(position['volume'])))
                 self.positions_table.setItem(i, 4, QTableWidgetItem(str(position['price_open'])))
                 self.positions_table.setItem(i, 5, QTableWidgetItem(str(position['profit'])))
-                
                 # 添加平仓按钮
                 close_btn = QPushButton("平仓")
                 close_btn.clicked.connect(lambda checked, ticket=position['ticket']: self.close_position(ticket))
@@ -865,6 +878,92 @@ class MT5GUI(QMainWindow):
                 self.trader.sync_closed_trades_to_excel()
             except Exception as e:
                 print(f"同步平仓单到excel出错: {str(e)}")
+
+    def check_daily_loss_limit(self) -> bool:
+        """检查是否超过日内最大亏损，超过则自动平仓并禁止交易，返回是否允许继续交易"""
+        # 1. 统计今日已实现亏损（从trade_records.xlsx或数据库/MT5历史）
+        # 2. 统计当前未实现浮动盈亏（所有持仓profit）
+        # 3. 合计后判断
+        try:
+            # 1. 统计今日已实现亏损
+            today = datetime.now().strftime('%Y-%m-%d')
+            realized_loss = 0
+            data_dir = 'data'
+            file_path = os.path.join(data_dir, 'trade_records.xlsx')
+            account_id = self.trader._get_account_id() if self.trader else 'unknown'
+            if os.path.exists(file_path):
+                try:
+                    df = pd.read_excel(file_path, sheet_name=str(account_id))
+                    if 'close_time' in df.columns and 'profit' in df.columns:
+                        df_today = df[df['close_time'].astype(str).str.startswith(today)]
+                        realized_loss = df_today['profit'].sum()
+                except Exception:
+                    pass
+            # 2. 统计当前未实现浮动盈亏
+            unrealized = 0
+            if self.trader and self.trader.connected:
+                positions = self.trader.get_all_positions()
+                if positions:
+                    unrealized = sum([p['profit'] for p in positions])
+            # 3. 合计
+            total = realized_loss + unrealized
+            if total <= -config.DAILY_LOSS_LIMIT:
+                # 超过最大亏损，自动平仓并禁止交易
+                self.close_all_positions()
+                self.disable_trading_for_today()
+                # 记录风控事件
+                detail = f"日内亏损已达{total:.2f}，已自动平仓并禁止交易"
+                self.db.record_risk_event('DAILY_LOSS_LIMIT', detail)
+                self.status_bar.showMessage(detail)
+                return False
+            return True
+        except Exception as e:
+            print(f"风控检查出错：{str(e)}")
+            return True
+
+    def disable_trading_for_today(self):
+        """禁止今日交易（禁用所有下单按钮）"""
+        self.place_batch_buy_btn.setEnabled(False)
+        self.place_batch_sell_btn.setEnabled(False)
+        self.place_breakout_high_btn.setEnabled(False)
+        self.place_breakout_low_btn.setEnabled(False)
+        self.status_bar.showMessage("已触发日内最大亏损，今日禁止交易！")
+
+    def update_daily_pnl_info(self):
+        """实时刷新盈亏信息"""
+        try:
+            today = datetime.now().strftime('%Y-%m-%d')
+            realized = 0
+            data_dir = 'data'
+            file_path = os.path.join(data_dir, 'trade_records.xlsx')
+            account_id = self.trader._get_account_id() if self.trader else 'unknown'
+            if os.path.exists(file_path):
+                try:
+                    df = pd.read_excel(file_path, sheet_name=str(account_id))
+                    if 'close_time' in df.columns and 'profit' in df.columns:
+                        df_today = df[df['close_time'].astype(str).str.startswith(today)]
+                        realized = df_today['profit'].sum()
+                except Exception:
+                    pass
+            unrealized = 0
+            if self.trader and self.trader.connected:
+                positions = self.trader.get_all_positions()
+                if positions:
+                    unrealized = sum([p['profit'] for p in positions])
+            total = realized + unrealized
+            self.realized_label.setText(f"今日已实现盈亏: {realized:.2f}")
+            self.unrealized_label.setText(f"当前浮动盈亏: {unrealized:.2f}")
+            self.total_pnl_label.setText(f"日内总盈亏: {total:.2f}")
+            # 风控高亮
+            if total <= -config.DAILY_LOSS_LIMIT:
+                self.total_pnl_label.setStyleSheet("QLabel { color: red; font-weight: bold; }")
+                self.total_pnl_label.setText(f"日内总盈亏: {total:.2f}（已禁止交易）")
+            else:
+                self.total_pnl_label.setStyleSheet("QLabel { color: black; font-weight: bold; }")
+        except Exception as e:
+            self.realized_label.setText("今日已实现盈亏: --")
+            self.unrealized_label.setText("当前浮动盈亏: --")
+            self.total_pnl_label.setText("日内总盈亏: --")
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

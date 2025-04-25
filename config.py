@@ -13,6 +13,9 @@ DEFAULT_TIMEFRAME = "M1"  # 可选值: M1, M5, M15, M30, H1, H4
 # 每日交易限制
 DAILY_TRADE_LIMIT = 5  # 每天最大交易次数
 
+# 每日最大亏损限制（单位：账户货币）
+DAILY_LOSS_LIMIT = 100
+
 # 界面设置
 GUI_SETTINGS = {
     "SOUND_ALERT": False,     # 收盘提醒声音默认开启
@@ -69,3 +72,7 @@ DEFAULT_PARAMS = {
         "max_tp_points": 100000
     }   
 }
+
+
+# 时间差
+Delta_TIMEZONE = -3

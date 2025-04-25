@@ -5,6 +5,9 @@ import time
 from typing import List, Dict, Optional
 import os
 from dotenv import load_dotenv
+import config
+from openpyxl import load_workbook
+from datetime import timedelta
 
 class MT5Trader:
     def __init__(self):
@@ -350,10 +353,9 @@ class MT5Trader:
         只用order_id（position_id）去重。
         建议每分钟调用一次。
         """
-        from openpyxl import load_workbook
-        from datetime import timedelta
         start_time = datetime.now() - timedelta(days=3)
-        deals = mt5.history_deals_get(start_time, datetime.now())
+        end_time = datetime.now() + timedelta(days=1)  # 修正时区问题，取未来一天
+        deals = mt5.history_deals_get(start_time, end_time)
         if deals is None:
             print('未获取到历史成交（deals）')
             return
@@ -377,6 +379,7 @@ class MT5Trader:
                 pass
         # 遍历所有平仓deal
         new_records = []
+        tz_delta = config.Delta_TIMEZONE
         for deal in deals:
             if deal.entry != mt5.DEAL_ENTRY_OUT:
                 continue
@@ -389,9 +392,10 @@ class MT5Trader:
                 if hasattr(d, 'position_id') and d.position_id == deal.position_id and d.entry == mt5.DEAL_ENTRY_IN:
                     open_deal = d
                     break
-            open_time = datetime.fromtimestamp(open_deal.time) if open_deal else ''
+            # 时间转换：MT5时间+tz_delta小时=本地时间
+            open_time = datetime.fromtimestamp(open_deal.time + tz_delta*3600) if open_deal else ''
             open_price = open_deal.price if open_deal else ''
-            close_time = datetime.fromtimestamp(deal.time)
+            close_time = datetime.fromtimestamp(deal.time + tz_delta*3600)
             close_price = deal.price
             profit = deal.profit
             direction = 'buy' if deal.type == mt5.ORDER_TYPE_BUY else 'sell'

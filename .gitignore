@@ -31,3 +31,9 @@ ENV/
 .vscode/
 *.swp
 *.swo
+
+# 打包
+build/
+MT5TradeManager/
+dist/
+data/
