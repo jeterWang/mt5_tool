@@ -13,26 +13,35 @@ DEFAULT_TIMEFRAME = "M1"  # 可选值: M1, M5, M15, M30, H1, H4
 # 每日交易限制
 DAILY_TRADE_LIMIT = 5  # 每天最大交易次数
 
+# 界面设置
+GUI_SETTINGS = {
+    "SOUND_ALERT": False,     # 收盘提醒声音默认开启
+    "WINDOW_TOP": True,     # 窗口置顶默认关闭
+    "ALERT_SECONDS": 5,      # 收盘前5秒开始提醒
+    "BEEP_FREQUENCY": 1000,  # 提示音频率
+    "BEEP_DURATION": 200     # 提示音持续时间(毫秒)
+}
+
 # 批量下单默认参数
 BATCH_ORDER_DEFAULTS = {
     "order1": {
         "volume": 0.20,
-        "sl_points": 1500,
+        "sl_points": 3000,
         "tp_points": 50000
     },
     "order2": {
         "volume": 0.20,
-        "sl_points": 1500,
+        "sl_points": 3000,
         "tp_points": 50000
     },
     "order3": {
         "volume": 0.20,
-        "sl_points": 1500,
+        "sl_points": 3000,
         "tp_points": 50000
     },
     "order4": {
         "volume": 0.20,
-        "sl_points": 1500,
+        "sl_points": 3000,
         "tp_points": 50000
     }
 }

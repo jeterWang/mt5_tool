@@ -99,7 +99,6 @@ class MT5Trader:
         if result.retcode != mt5.TRADE_RETCODE_DONE:
             print(f"下单失败: {result.comment}")
             return None
-
         return result.order
 
     def place_order_with_tp_sl(self, symbol: str, order_type: str, volume: float, 
@@ -169,7 +168,6 @@ class MT5Trader:
             if result.retcode != mt5.TRADE_RETCODE_DONE:
                 print(f"下单失败，错误代码：{result.retcode}")
                 return None
-                
             return result.order
         except Exception as e:
             print(f"下单出错：{str(e)}")
@@ -206,12 +204,11 @@ class MT5Trader:
             return None
 
         # 创建分批止盈订单
-        for i, level in enumerate(tp_levels[:-1]):  # 除了最后一个止盈点
+        for i, level in enumerate(tp_levels[:-1]):
             tp_comment = f"{comment}_TP_{i+1}"
             self.place_order_with_tp_sl(
                 symbol, order_type, level['volume'], sl_points, level['points'], comment
             )
-
         return main_order
 
     def get_position(self, ticket: int) -> Optional[Dict]:
@@ -319,6 +316,116 @@ class MT5Trader:
         except Exception as e:
             print(f"获取账户信息失败: {str(e)}")
             return None
+
+    def _record_trade_to_excel(self, account_id, trade_info):
+        """
+        记录交易到excel，按账号分sheet
+        :param account_id: 账号ID
+        :param trade_info: 交易信息dict
+        """
+        data_dir = 'data'
+        os.makedirs(data_dir, exist_ok=True)
+        file_path = os.path.join(data_dir, 'trade_records.xlsx')
+        sheet_name = str(account_id)
+        df_new = pd.DataFrame([trade_info])
+        if os.path.exists(file_path):
+            with pd.ExcelWriter(file_path, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
+                try:
+                    df_old = pd.read_excel(file_path, sheet_name=sheet_name)
+                    df_all = pd.concat([df_old, df_new], ignore_index=True)
+                except Exception:
+                    df_all = df_new
+                df_all.to_excel(writer, sheet_name=sheet_name, index=False)
+        else:
+            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                df_new.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    def _get_account_id(self):
+        info = mt5.account_info()
+        return info.login if info else 'unknown'
+
+    def sync_closed_trades_to_excel(self):
+        """
+        扫描近3天所有平仓单（包括自动止损/止盈），并将未记录过的平仓单写入excel。
+        只用order_id（position_id）去重。
+        建议每分钟调用一次。
+        """
+        from openpyxl import load_workbook
+        from datetime import timedelta
+        start_time = datetime.now() - timedelta(days=3)
+        deals = mt5.history_deals_get(start_time, datetime.now())
+        if deals is None:
+            print('未获取到历史成交（deals）')
+            return
+        print(f'开始同步平仓单，deals数量: {len(deals)}')
+        for deal in deals:
+            print(f'deal_id={deal.ticket}, position_id={deal.position_id}, symbol={deal.symbol}, entry={deal.entry}, type={deal.type}, volume={deal.volume}, price={deal.price}, profit={deal.profit}, comment={deal.comment}')
+        # 按账号分组
+        account_id = self._get_account_id()
+        data_dir = 'data'
+        os.makedirs(data_dir, exist_ok=True)
+        file_path = os.path.join(data_dir, 'trade_records.xlsx')
+        sheet_name = str(account_id)
+        # 读取已记录的order_id（position_id）
+        recorded_order_ids = set()
+        if os.path.exists(file_path):
+            try:
+                df = pd.read_excel(file_path, sheet_name=sheet_name)
+                if 'order_id' in df.columns:
+                    recorded_order_ids = set(df['order_id'].astype(str))
+            except Exception:
+                pass
+        # 遍历所有平仓deal
+        new_records = []
+        for deal in deals:
+            if deal.entry != mt5.DEAL_ENTRY_OUT:
+                continue
+            order_id = str(deal.position_id)
+            if order_id in recorded_order_ids:
+                continue
+            # 获取开仓deal
+            open_deal = None
+            for d in deals:
+                if hasattr(d, 'position_id') and d.position_id == deal.position_id and d.entry == mt5.DEAL_ENTRY_IN:
+                    open_deal = d
+                    break
+            open_time = datetime.fromtimestamp(open_deal.time) if open_deal else ''
+            open_price = open_deal.price if open_deal else ''
+            close_time = datetime.fromtimestamp(deal.time)
+            close_price = deal.price
+            profit = deal.profit
+            direction = 'buy' if deal.type == mt5.ORDER_TYPE_BUY else 'sell'
+            close_info = {
+                'close_time': close_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'order_id': order_id,
+                'account': account_id,
+                'symbol': deal.symbol,
+                'volume': deal.volume,
+                'direction': direction,
+                'open_price': open_price,
+                'close_price': close_price,
+                'open_time': open_time.strftime('%Y-%m-%d %H:%M:%S') if open_time else '',
+                'profit': profit,
+                'comment': deal.comment
+            }
+            print(f'发现新平仓单，准备写入excel: {close_info}')
+            new_records.append(close_info)
+        if new_records:
+            df_new = pd.DataFrame(new_records)
+            if os.path.exists(file_path):
+                with pd.ExcelWriter(file_path, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
+                    try:
+                        df_old = pd.read_excel(file_path, sheet_name=sheet_name)
+                        df_all = pd.concat([df_old, df_new], ignore_index=True)
+                    except Exception:
+                        df_all = df_new
+                    df_all.to_excel(writer, sheet_name=sheet_name, index=False)
+            else:
+                with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                    df_new.to_excel(writer, sheet_name=sheet_name, index=False)
+            print(f'已写入{len(new_records)}条新平仓单到excel')
+        else:
+            print('本次无新平仓单写入excel')
 
 # 使用示例
 if __name__ == "__main__":

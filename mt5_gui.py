@@ -10,10 +10,36 @@ import winsound  # 用于Windows系统的蜂鸣器
 from mt5_trader import MT5Trader
 import os
 from dotenv import load_dotenv
-import config
+import importlib.util
+
+def resource_path(filename):
+    if getattr(sys, 'frozen', False):
+        return os.path.join(os.path.dirname(sys.executable), filename)
+    else:
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+
+def load_external_config():
+    # 兼容pyinstaller打包后路径，优先加载exe同目录下的config.py
+    if getattr(sys, 'frozen', False):
+        base_path = os.path.dirname(sys.executable)
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(base_path, "config.py")
+    if os.path.exists(config_path):
+        spec = importlib.util.spec_from_file_location("config", config_path)
+        config = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(config)
+        sys.modules["config"] = config  # 覆盖全局config模块
+        return config
+    else:
+        import config  # fallback
+        return config
+
+config = load_external_config()
+
+from database import TradeDatabase
 import MetaTrader5 as mt5
 from datetime import datetime
-from database import TradeDatabase
 
 class MT5GUI(QMainWindow):
     def __init__(self):
@@ -31,8 +57,8 @@ class MT5GUI(QMainWindow):
         # 用于控制提示音间隔
         self.last_beep_time = 0
         
-        # 设置窗口图标
-        self.setWindowIcon(QIcon("icon.svg"))
+        # 设置窗口图标（修正）
+        self.setWindowIcon(QIcon(resource_path("icon.svg")))
         
         # 初始化交易次数显示
         self.update_trade_count_display()
@@ -79,12 +105,12 @@ class MT5GUI(QMainWindow):
         
         # 添加声音提醒选项
         self.sound_checkbox = QCheckBox("收盘提醒")
-        self.sound_checkbox.setChecked(True)
+        self.sound_checkbox.setChecked(config.GUI_SETTINGS["SOUND_ALERT"])
         countdown_layout.addWidget(self.sound_checkbox)
         
         # 添加窗口置顶选项
         self.topmost_checkbox = QCheckBox("窗口置顶")
-        self.topmost_checkbox.setChecked(False)
+        self.topmost_checkbox.setChecked(config.GUI_SETTINGS["WINDOW_TOP"])
         self.topmost_checkbox.stateChanged.connect(self.toggle_topmost)
         countdown_layout.addWidget(self.topmost_checkbox)
         
@@ -374,6 +400,11 @@ class MT5GUI(QMainWindow):
         self.account_timer = QTimer()
         self.account_timer.timeout.connect(self.update_account_info)
         self.account_timer.start(5000)  # 每5秒更新一次账户信息
+
+        # 每分钟自动同步所有平仓单到excel
+        self.closed_trade_timer = QTimer()
+        self.closed_trade_timer.timeout.connect(self.sync_closed_trades)
+        self.closed_trade_timer.start(60 * 1000)  # 每分钟执行一次
 
     def connect_mt5(self):
         """连接MT5"""
@@ -731,11 +762,12 @@ class MT5GUI(QMainWindow):
                 self.countdown_label.setStyleSheet("QLabel { color: black; font-size: 14px; font-weight: bold; }")
 
             # 声音提醒
-            if self.sound_checkbox.isChecked() and seconds_left <= 5:
+            if self.sound_checkbox.isChecked() and seconds_left <= config.GUI_SETTINGS["ALERT_SECONDS"]:
                 current_timestamp = current_time.timestamp()
                 # 确保提示音间隔至少1秒
                 if current_timestamp - self.last_beep_time >= 1:
-                    winsound.Beep(1000, 100)  # 1000Hz, 持续100毫秒
+                    winsound.Beep(config.GUI_SETTINGS["BEEP_FREQUENCY"], 
+                                config.GUI_SETTINGS["BEEP_DURATION"])
                     self.last_beep_time = current_timestamp
 
         except Exception as e:
@@ -827,6 +859,12 @@ class MT5GUI(QMainWindow):
                 self.free_margin_label.setText(f"可用保证金: {account_info['free_margin']:.2f}")
                 self.margin_level_label.setText(f"保证金水平: {account_info['margin_level']:.2f}%")
                 
+    def sync_closed_trades(self):
+        if self.trader and self.trader.is_connected():
+            try:
+                self.trader.sync_closed_trades_to_excel()
+            except Exception as e:
+                print(f"同步平仓单到excel出错: {str(e)}")
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
