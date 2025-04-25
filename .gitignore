@@ -36,4 +36,7 @@ ENV/
 build/
 MT5TradeManager/
 dist/
+
+# 数据
 data/
+*.db
