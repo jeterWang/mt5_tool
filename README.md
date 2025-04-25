@@ -15,7 +15,7 @@ MT5TradeManager 是一款基于MetaTrader 5的多功能量化交易管理工具�
 
 ## 使用方法
 1. **下载release压缩包**
-   - 前往[Release页面](https://github.com/yourrepo/mt5trademanager/releases)下载最新版 `MT5TradeManager.zip`。
+   - 前往[Release页面](https://github.com/yourrepo/mt5trademanager/releases)下载最新版 `MT5TradeManager.7z`。
 2. **解压**
    - 将压缩包解压到任意目录。
 3. **运行**
