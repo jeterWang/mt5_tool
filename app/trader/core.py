@@ -23,7 +23,7 @@ from app.trader.orders import (
     place_order_with_partial_tp,
     close_position,
 )
-from app.trader.orders import cancel_order
+from app.trader.orders import cancel_order, modify_position_sl_tp
 from app.trader.data_sync import sync_closed_trades_to_excel
 
 
@@ -188,6 +188,12 @@ class MT5Trader:
     def cancel_order(self, ticket: int) -> bool:
         """撤销挂单"""
         return cancel_order(ticket)
+
+    def modify_position_sl_tp(
+        self, ticket: int, sl: float = None, tp: float = None
+    ) -> bool:
+        """修改持仓的止损止盈"""
+        return modify_position_sl_tp(ticket, sl, tp)
 
     # 数据同步方法
     def sync_closed_trades_to_excel(self):

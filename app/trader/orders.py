@@ -492,3 +492,59 @@ def place_order_with_key_level_sl(
     except Exception as e:
         print(f"下单出错：{str(e)}")
         return None
+
+
+def modify_position_sl_tp(ticket: int, sl: float = None, tp: float = None) -> bool:
+    """
+    修改持仓的止损止盈
+
+    Args:
+        ticket: 持仓订单号
+        sl: 新的止损价格，None表示不修改
+        tp: 新的止盈价格，None表示不修改
+
+    Returns:
+        是否修改成功
+    """
+    try:
+        # 获取持仓信息
+        position = mt5.positions_get(ticket=ticket)
+        if not position:
+            print(f"未找到持仓: {ticket}")
+            return False
+
+        position = position[0]._asdict()
+
+        # 准备修改请求
+        request = {
+            "action": mt5.TRADE_ACTION_SLTP,
+            "symbol": position["symbol"],
+            "position": ticket,
+        }
+
+        # 只有当参数不为None时才添加到请求中
+        if sl is not None:
+            request["sl"] = sl
+        else:
+            # 如果不修改止损，保持原来的止损价格
+            request["sl"] = position["sl"]
+
+        if tp is not None:
+            request["tp"] = tp
+        else:
+            # 如果不修改止盈，保持原来的止盈价格
+            request["tp"] = position["tp"]
+
+        # 发送修改请求
+        result = mt5.order_send(request)
+        if result.retcode != mt5.TRADE_RETCODE_DONE:
+            print(
+                f"修改止损止盈失败，错误代码：{result.retcode}，描述：{result.comment}"
+            )
+            return False
+
+        return True
+
+    except Exception as e:
+        print(f"修改止损止盈出错：{str(e)}")
+        return False

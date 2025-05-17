@@ -140,6 +140,29 @@ class TradingButtonsSection:
             """
         )
 
+        # 一键保本按钮
+        self.breakeven_all_btn = QPushButton("一键保本")
+        self.breakeven_all_btn.setEnabled(False)
+        self.breakeven_all_btn.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #9b59b6;
+                color: white;
+                border: none;
+                padding: 5px;
+                font-weight: bold;
+                min-width: 100px;
+                min-height: 30px;
+            }
+            QPushButton:hover {
+                background-color: #8e44ad;
+            }
+            QPushButton:disabled {
+                background-color: #95a5a6;
+            }
+            """
+        )
+
         # 一键平仓按钮
         self.close_all_btn = QPushButton("一键平仓")
         self.close_all_btn.setEnabled(False)
@@ -169,6 +192,7 @@ class TradingButtonsSection:
         self.layout.addWidget(self.place_breakout_high_btn)
         self.layout.addWidget(self.place_breakout_low_btn)
         self.layout.addWidget(self.cancel_all_pending_btn)
+        self.layout.addWidget(self.breakeven_all_btn)
         self.layout.addWidget(self.close_all_btn)
 
     def connect_signals(self):
@@ -184,12 +208,23 @@ class TradingButtonsSection:
             lambda: self.place_breakout_order("low")
         )
         self.cancel_all_pending_btn.clicked.connect(self.cancel_all_pending_orders)
+        self.breakeven_all_btn.clicked.connect(self.breakeven_all_positions)
         self.close_all_btn.clicked.connect(self.close_all_positions)
 
     def set_trader_and_window(self, trader, gui_window):
         """设置交易者和主窗口引用"""
         self.trader = trader
         self.gui_window = gui_window
+
+        # 在设置完trader引用后，如果已连接就启用按钮
+        if self.trader and self.trader.is_connected():
+            self.place_batch_buy_btn.setEnabled(True)
+            self.place_batch_sell_btn.setEnabled(True)
+            self.place_breakout_high_btn.setEnabled(True)
+            self.place_breakout_low_btn.setEnabled(True)
+            self.cancel_all_pending_btn.setEnabled(True)
+            self.breakeven_all_btn.setEnabled(True)
+            self.close_all_btn.setEnabled(True)
 
     def place_batch_orders(self, order_type: str):
         """
@@ -540,6 +575,73 @@ class TradingButtonsSection:
                 )
         except Exception as e:
             self.gui_window.status_bar.showMessage(f"一键平仓出错：{str(e)}")
+
+    def breakeven_all_positions(self):
+        """将所有持仓的止损移动到入场价（保本）"""
+        try:
+            # 检查MT5连接状态
+            if not self.trader or not self.trader.is_connected():
+                self.gui_window.status_bar.showMessage("MT5未连接，请检查连接状态！")
+                return
+
+            # 检查MT5自动交易是否启用
+            if not mt5.terminal_info().trade_allowed:
+                self.gui_window.status_bar.showMessage("请在MT5平台中启用自动交易！")
+                return
+
+            # 获取所有持仓
+            positions = mt5.positions_get()
+            if positions is None:
+                self.gui_window.status_bar.showMessage("获取持仓失败！")
+                return
+
+            if len(positions) == 0:
+                self.gui_window.status_bar.showMessage("当前没有持仓！")
+                return
+
+            # 统计成功和失败的订单
+            success_count = 0
+            failed_positions = []
+            modified_positions = []
+
+            # 遍历所有持仓
+            for position in positions:
+                # 获取订单属性
+                position_id = position.ticket
+                entry_price = position.price_open
+
+                # 使用trader中的修改止损止盈方法
+                if self.trader.modify_position_sl_tp(
+                    position_id, sl=entry_price, tp=None
+                ):
+                    success_count += 1
+                    modified_positions.append(position_id)
+                else:
+                    failed_positions.append(position_id)
+                    print(f"修改止损失败，订单号: {position_id}")
+
+            # 显示操作结果
+            if success_count > 0:
+                self.gui_window.status_bar.showMessage(
+                    f"成功将{success_count}个持仓的止损移动到入场价！订单号: {', '.join(map(str, modified_positions))}"
+                )
+                # 播放提示音
+                winsound.Beep(
+                    GUI_SETTINGS["BEEP_FREQUENCY"], GUI_SETTINGS["BEEP_DURATION"]
+                )
+
+            if failed_positions:
+                print(f"以下订单修改失败: {', '.join(map(str, failed_positions))}")
+                # 如果有失败的，在日志中显示
+                if success_count == 0:
+                    self.gui_window.status_bar.showMessage(f"所有持仓保本操作失败！")
+                else:
+                    # 已经在上面显示了成功信息，这里只记录日志
+                    pass
+
+        except Exception as e:
+            self.gui_window.status_bar.showMessage(f"保本操作出错：{str(e)}")
+            print(f"保本操作错误详情：{str(e)}")
 
     def get_timeframe(self, timeframe: str) -> int:
         """

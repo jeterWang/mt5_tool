@@ -6,6 +6,7 @@
 
 import os
 import json
+import sys
 
 # 基础配置
 SYMBOLS = ["BTCUSD", "ETHUSD", "EURUSD", "GBPUSD", "XAUUSD", "XAGUSD"]
@@ -55,9 +56,21 @@ def get_config_path():
     Returns:
         配置文件的完整路径
     """
-    # 获取当前文件所在的目录
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(current_dir, "config.json")
+    try:
+        # 获取当前执行文件的目录
+        if getattr(sys, "frozen", False):
+            # 如果是打包后的可执行文件
+            base_dir = os.path.dirname(sys.executable)
+            # 打包后的配置文件放在可执行文件同级目录的config文件夹中
+            return os.path.join(base_dir, "config", "config.json")
+        else:
+            # 如果是开发环境
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            return os.path.join(current_dir, "config.json")
+    except Exception as e:
+        print(f"获取配置文件路径出错: {str(e)}")
+        # 返回一个相对路径作为备选
+        return "config/config.json"
 
 
 def load_config():
@@ -140,20 +153,52 @@ def save_config():
         }
 
         config_path = get_config_path()
+        print(f"save_config: 尝试保存到 {config_path}")  # 调试信息
+
+        # 确保config目录存在
+        config_dir = os.path.dirname(config_path)
+        if not os.path.exists(config_dir):
+            print(f"save_config: 创建目录 {config_dir}")
+            os.makedirs(config_dir, exist_ok=True)
+
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
 
         # 验证保存是否成功
-        with open(config_path, "r", encoding="utf-8") as f:
-            saved_config = json.load(f)
-            print(
-                f"save_config: 文件中的SYMBOLS = {saved_config.get('SYMBOLS', '未找到')}"
-            )  # 调试信息
-
-        return True
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    saved_config = json.load(f)
+                    print(
+                        f"save_config: 文件中的SYMBOLS = {saved_config.get('SYMBOLS', '未找到')}"
+                    )  # 调试信息
+                    return True
+            except Exception as e:
+                print(f"save_config: 验证保存失败: {str(e)}")
+                return False
+        else:
+            print(f"save_config: 配置文件未创建成功")
+            return False
     except Exception as e:
-        print(f"保存配置出错：{str(e)}")
-        return False
+        print(f"保存配置出错: {str(e)}")
+        # 尝试保存到备选位置
+        try:
+            backup_path = os.path.join(
+                (
+                    os.path.dirname(sys.executable)
+                    if getattr(sys, "frozen", False)
+                    else "."
+                ),
+                "config.json",
+            )
+            print(f"save_config: 尝试保存到备选位置 {backup_path}")
+            with open(backup_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4, ensure_ascii=False)
+            print(f"save_config: 已保存到备选位置 {backup_path}")
+            return True
+        except Exception as backup_e:
+            print(f"save_config: 备选保存也失败: {str(backup_e)}")
+            return False
 
 
 # 加载配置
