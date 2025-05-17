@@ -14,15 +14,18 @@ from PyQt6.QtWidgets import (
     QLabel,
     QStatusBar,
     QCheckBox,
+    QMenuBar,
+    QMenu,
+    QPushButton,
 )
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon, QFont, QFontDatabase
+from PyQt6.QtGui import QIcon, QFont, QFontDatabase, QAction
 import os
 
 from utils.paths import get_icon_path, get_font_path
 from app.trader import MT5Trader
 from app.database import TradeDatabase
-from config.loader import GUI_SETTINGS
+from config.loader import GUI_SETTINGS, SL_MODE, SYMBOLS, load_config
 from app.gui.account_info import AccountInfoSection
 from app.gui.pnl_info import PnlInfoSection
 from app.gui.countdown import CountdownSection
@@ -30,6 +33,7 @@ from app.gui.trading_settings import TradingSettingsSection
 from app.gui.batch_order import BatchOrderSection
 from app.gui.trading_buttons import TradingButtonsSection
 from app.gui.positions_table import PositionsTableSection
+from app.gui.settings import show_settings_dialog
 
 
 def load_chinese_font():
@@ -50,6 +54,12 @@ class MT5GUI(QMainWindow):
     def __init__(self):
         """初始化GUI界面"""
         super().__init__()
+
+        # 确保在初始化前加载最新配置
+        print(f"MT5GUI初始化前SYMBOLS = {SYMBOLS}")
+        load_config()
+        print(f"MT5GUI初始化后SYMBOLS = {SYMBOLS}")
+
         self.trader = None
 
         # 初始化数据库
@@ -61,6 +71,9 @@ class MT5GUI(QMainWindow):
         # 设置窗口标题和大小
         self.setWindowTitle("MT5交易系统")
         self.setGeometry(100, 100, 1000, 800)
+
+        # 创建菜单栏
+        self.create_menu_bar()
 
         # 创建UI组件
         self.components = {}
@@ -89,6 +102,40 @@ class MT5GUI(QMainWindow):
             self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
             self.show()
 
+    def create_menu_bar(self):
+        """创建菜单栏"""
+        menu_bar = QMenuBar(self)
+        self.setMenuBar(menu_bar)
+
+        # 文件菜单
+        file_menu = QMenu("文件(&F)", self)
+        menu_bar.addMenu(file_menu)
+
+        # 退出菜单项
+        exit_action = QAction("退出(&Q)", self)
+        exit_action.setShortcut("Ctrl+Q")
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+
+        # 设置菜单（与文件菜单平级）
+        settings_menu = QMenu("设置(&S)", self)
+        menu_bar.addMenu(settings_menu)
+
+        # 系统设置菜单项
+        system_settings_action = QAction("系统设置(&S)", self)
+        system_settings_action.setShortcut("Ctrl+S")
+        system_settings_action.triggered.connect(self.open_settings)
+        settings_menu.addAction(system_settings_action)
+
+        # 帮助菜单
+        help_menu = QMenu("帮助(&H)", self)
+        menu_bar.addMenu(help_menu)
+
+        # 关于菜单项
+        about_action = QAction("关于(&A)", self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
+
     def setup_font(self):
         """设置全局字体"""
         font_family = load_chinese_font()
@@ -107,9 +154,24 @@ class MT5GUI(QMainWindow):
         self.setCentralWidget(main_widget)
         main_layout = QVBoxLayout(main_widget)
 
+        # 添加顶部区域（账户信息和系统设置按钮）
+        top_layout = QHBoxLayout()
+
         # 添加账户信息和交易次数显示
         self.components["account_info"] = AccountInfoSection()
-        main_layout.addLayout(self.components["account_info"].layout)
+        top_layout.addLayout(self.components["account_info"].layout)
+
+        # 添加一个伸缩空间，使系统设置按钮靠右
+        top_layout.addStretch()
+
+        # 右上角添加系统设置按钮
+        settings_button = QPushButton("系统设置")
+        settings_button.setFixedWidth(100)  # 设置固定宽度
+        settings_button.setStyleSheet("background-color: #f0f0f0;")  # 设置背景颜色
+        settings_button.clicked.connect(self.open_settings)
+        top_layout.addWidget(settings_button)
+
+        main_layout.addLayout(top_layout)
 
         # 添加盈亏信息行
         self.components["pnl_info"] = PnlInfoSection()
@@ -249,8 +311,20 @@ class MT5GUI(QMainWindow):
         if not self.trader or not self.trader.is_connected():
             return
 
+        # 打印更新前的SYMBOLS
+        print(f"update_symbols_list: 更新前SYMBOLS = {SYMBOLS}")
+
+        # 重新加载配置，确保使用最新的SYMBOLS列表
+        load_config()
+
+        # 打印更新后的SYMBOLS
+        print(f"update_symbols_list: 更新后SYMBOLS = {SYMBOLS}")
+
         trading_settings = self.components["trading_settings"]
         trading_settings.update_symbols_list(self.trader)
+
+        # 更新完成后强制刷新UI
+        self.status_bar.showMessage("交易品种列表已更新")
 
     def update_positions(self):
         """更新持仓信息，并检查风控"""
@@ -334,3 +408,58 @@ class MT5GUI(QMainWindow):
             self.trader.disconnect()
 
         event.accept()
+
+    def open_settings(self):
+        """打开设置对话框"""
+        if show_settings_dialog(self):
+            # 如果设置已保存，更新UI显示
+            self.update_ui_from_settings()
+
+    def update_ui_from_settings(self):
+        """从配置更新UI显示"""
+        # 更新窗口置顶状态
+        if GUI_SETTINGS["WINDOW_TOP"]:
+            if not (self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint):
+                self.setWindowFlags(
+                    self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint
+                )
+                self.show()
+        else:
+            if self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint:
+                self.setWindowFlags(
+                    self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint
+                )
+                self.show()
+
+        # 更新复选框状态
+        self.topmost_checkbox.setChecked(GUI_SETTINGS["WINDOW_TOP"])
+        self.components["countdown"].sound_checkbox.setChecked(
+            GUI_SETTINGS["SOUND_ALERT"]
+        )
+
+        # 更新交易设置
+        trading_settings = self.components["trading_settings"]
+        trading_settings.sl_mode_combo.setCurrentIndex(
+            0 if SL_MODE["DEFAULT_MODE"] == "FIXED_POINTS" else 1
+        )
+
+        # 更新批量下单设置
+        from app.gui.batch_order import update_sl_mode
+
+        update_sl_mode(SL_MODE["DEFAULT_MODE"])
+
+        # 更新状态栏提示
+        self.status_bar.showMessage("配置已更新")
+
+    def show_about(self):
+        """显示关于对话框"""
+        from PyQt6.QtWidgets import QMessageBox
+
+        QMessageBox.about(
+            self,
+            "关于MT5交易系统",
+            "MT5交易系统 v1.0\n\n"
+            "一个与MetaTrader 5集成的自动化交易系统\n"
+            "支持批量下单、突破交易和风控管理\n\n"
+            "© 2023 All Rights Reserved",
+        )

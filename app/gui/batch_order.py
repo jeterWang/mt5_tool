@@ -33,7 +33,8 @@ class BatchOrderSection:
 
         # 批量下单设置控件
         self.volume_inputs = []
-        self.sl_points_inputs = []
+        self.sl_points_inputs = []  # 固定点数止损
+        self.sl_candle_inputs = []  # K线回溯数量
         self.tp_points_inputs = []
         self.sl_labels = []  # 存储止损标签的引用，以便动态修改
 
@@ -62,6 +63,18 @@ class BatchOrderSection:
             sl_points_input.setValue(BATCH_ORDER_DEFAULTS[f"order{i}"]["sl_points"])
             self.sl_points_inputs.append(sl_points_input)
 
+            # K线回溯数量输入（初始隐藏）
+            sl_candle_input = QSpinBox()
+            sl_candle_input.setRange(1, 20)
+            # 使用get方法获取sl_candle字段，如果不存在则使用CANDLE_LOOKBACK作为默认值
+            sl_candle_input.setValue(
+                BATCH_ORDER_DEFAULTS[f"order{i}"].get(
+                    "sl_candle", SL_MODE["CANDLE_LOOKBACK"]
+                )
+            )
+            sl_candle_input.setVisible(False)  # 初始隐藏
+            self.sl_candle_inputs.append(sl_candle_input)
+
             # 止盈点数输入
             tp_points_input = QSpinBox()
             tp_points_input.setRange(0, 100000)
@@ -72,6 +85,7 @@ class BatchOrderSection:
             order_layout.addWidget(volume_input)
             order_layout.addWidget(sl_label)
             order_layout.addWidget(sl_points_input)
+            order_layout.addWidget(sl_candle_input)  # 添加控件但初始隐藏
             order_layout.addWidget(QLabel("止盈点数:"))
             order_layout.addWidget(tp_points_input)
 
@@ -93,6 +107,11 @@ class BatchOrderSection:
             for label in self.sl_labels:
                 label.setText("止损点数:")
 
+            # 切换显示固定点数控件，隐藏K线回溯控件
+            for i in range(len(self.sl_points_inputs)):
+                self.sl_points_inputs[i].setVisible(True)
+                self.sl_candle_inputs[i].setVisible(False)
+
             # 更新输入范围（针对点数）
             for sl_input in self.sl_points_inputs:
                 sl_input.setRange(0, 100000)
@@ -102,13 +121,24 @@ class BatchOrderSection:
         else:  # K线关键位止损
             # 更新标签文本
             for label in self.sl_labels:
-                label.setText("K线个数:")
+                label.setText("K线回溯:")
 
-            # 更新输入范围（针对K线个数）
-            for sl_input in self.sl_points_inputs:
+            # 切换显示K线回溯控件，隐藏固定点数控件
+            for i in range(len(self.sl_points_inputs)):
+                self.sl_points_inputs[i].setVisible(False)
+                self.sl_candle_inputs[i].setVisible(True)
+
+            # 更新K线回溯输入范围
+            for i, sl_input in enumerate(self.sl_candle_inputs):
                 sl_input.setRange(1, 20)  # 最少1根K线，最多20根
                 sl_input.setSingleStep(1)  # 以1为步进
-                sl_input.setValue(SL_MODE["CANDLE_LOOKBACK"])  # 使用配置中的默认值
+                # 使用配置中的默认值
+                order_key = f"order{i+1}"
+                sl_input.setValue(
+                    BATCH_ORDER_DEFAULTS[order_key].get(
+                        "sl_candle", SL_MODE["CANDLE_LOOKBACK"]
+                    )
+                )
 
     def update_symbol_params(self, symbol_params):
         """
@@ -154,7 +184,14 @@ class BatchOrderSection:
                     self.sl_points_inputs[i].setValue(
                         BATCH_ORDER_DEFAULTS[order_key]["sl_points"]
                     )
-                # K线止损模式下，我们已经在update_sl_mode中设置了值
+                else:
+                    # K线止损模式
+                    self.sl_candle_inputs[i].setValue(
+                        BATCH_ORDER_DEFAULTS[order_key].get(
+                            "sl_candle", SL_MODE["CANDLE_LOOKBACK"]
+                        )
+                    )
+
                 self.tp_points_inputs[i].setValue(
                     BATCH_ORDER_DEFAULTS[order_key]["tp_points"]
                 )

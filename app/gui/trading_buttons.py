@@ -263,21 +263,21 @@ class TradingButtonsSection:
                     # 获取K线数据
                     countdown = self.gui_window.components["countdown"]
                     timeframe = countdown.timeframe_combo.currentText()
-                    # 使用输入框中的值作为K线回溯数量
-                    lookback = batch_order.sl_points_inputs[i].value()
+                    # 使用sl_candle_inputs中的值作为K线回溯数量
+                    lookback = batch_order.sl_candle_inputs[i].value()
 
                     rates = mt5.copy_rates_from_pos(
-                        symbol, self.get_timeframe(timeframe), 0, lookback
+                        symbol, self.get_timeframe(timeframe), 0, lookback + 2
                     )
-                    if rates is None or len(rates) < lookback:
+                    if rates is None or len(rates) < lookback + 2:
                         self.gui_window.status_bar.showMessage(
-                            f"获取K线数据失败，需要至少{lookback}根K线！"
+                            f"获取K线数据失败，需要至少{lookback + 2}根K线！"
                         )
                         return
 
-                    # 计算最低点和最高点
-                    lowest_point = min([rate["low"] for rate in rates])
-                    highest_point = max([rate["high"] for rate in rates])
+                    # 计算最低点和最高点（跳过当前K线和前一根K线）
+                    lowest_point = min([rate["low"] for rate in rates[2:]])
+                    highest_point = max([rate["high"] for rate in rates[2:]])
 
                     if order_type == "buy":
                         sl_price = lowest_point - sl_offset
@@ -299,7 +299,7 @@ class TradingButtonsSection:
             if orders:
                 # 更新默认K线回溯数量
                 if sl_mode == "CANDLE_KEY_LEVEL":
-                    SL_MODE["CANDLE_LOOKBACK"] = batch_order.sl_points_inputs[0].value()
+                    SL_MODE["CANDLE_LOOKBACK"] = batch_order.sl_candle_inputs[0].value()
                     # 保存配置
                     trading_settings.on_sl_mode_changed(
                         trading_settings.sl_mode_combo.currentIndex()
@@ -419,22 +419,24 @@ class TradingButtonsSection:
                         )
                 else:
                     # 使用K线关键位止损
-                    # 获取用户设置的K线回溯数量
-                    lookback = batch_order.sl_points_inputs[i].value()
+                    # 获取K线数据
+                    countdown = self.gui_window.components["countdown"]
+                    timeframe = countdown.timeframe_combo.currentText()
+                    # 使用sl_candle_inputs中的值作为K线回溯数量
+                    lookback = batch_order.sl_candle_inputs[i].value()
 
-                    # 获取更多K线数据
-                    candle_rates = mt5.copy_rates_from_pos(
-                        symbol, self.get_timeframe(timeframe), 0, lookback
+                    rates = mt5.copy_rates_from_pos(
+                        symbol, self.get_timeframe(timeframe), 0, lookback + 2
                     )
-                    if candle_rates is None or len(candle_rates) < lookback:
+                    if rates is None or len(rates) < lookback + 2:
                         self.gui_window.status_bar.showMessage(
-                            f"获取K线数据失败，需要至少{lookback}根K线！"
+                            f"获取K线数据失败，需要至少{lookback + 2}根K线！"
                         )
                         return
 
-                    # 计算最低点和最高点
-                    lowest_point = min([rate["low"] for rate in candle_rates])
-                    highest_point = max([rate["high"] for rate in candle_rates])
+                    # 计算最低点和最高点（跳过当前K线和前一根K线）
+                    lowest_point = min([rate["low"] for rate in rates[2:]])
+                    highest_point = max([rate["high"] for rate in rates[2:]])
 
                     if breakout_type == "high":
                         sl_price = lowest_point - sl_offset * point
@@ -456,13 +458,13 @@ class TradingButtonsSection:
                     orders.append(order)
                     # 记录订单详情
                     order_details.append(
-                        f"订单{i+1}: K线数={batch_order.sl_points_inputs[i].value()}, 止损价={sl_price:.5f}"
+                        f"订单{i+1}: K线数={batch_order.sl_candle_inputs[i].value()}, 止损价={sl_price:.5f}"
                     )
 
             if orders:
                 # 更新默认K线回溯数量
                 if sl_mode == "CANDLE_KEY_LEVEL":
-                    SL_MODE["CANDLE_LOOKBACK"] = batch_order.sl_points_inputs[0].value()
+                    SL_MODE["CANDLE_LOOKBACK"] = batch_order.sl_candle_inputs[0].value()
                     # 保存配置
                     trading_settings.on_sl_mode_changed(
                         trading_settings.sl_mode_combo.currentIndex()

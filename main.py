@@ -11,6 +11,13 @@ from app.gui import MT5GUI
 
 def main():
     """启动应用程序"""
+    # 确保正确加载配置
+    from config.loader import load_config, SYMBOLS
+
+    print(f"程序启动前SYMBOLS = {SYMBOLS}")
+    load_config()
+    print(f"程序启动后SYMBOLS = {SYMBOLS}")
+
     app = QApplication(sys.argv)
     window = MT5GUI()
     window.show()

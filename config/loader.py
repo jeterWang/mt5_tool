@@ -41,10 +41,10 @@ BREAKOUT_SETTINGS = {
 
 # 批量订单默认参数
 BATCH_ORDER_DEFAULTS = {
-    "order1": {"volume": 0.10, "sl_points": 500, "tp_points": 1000},
-    "order2": {"volume": 0.10, "sl_points": 500, "tp_points": 1500},
-    "order3": {"volume": 0.10, "sl_points": 500, "tp_points": 2000},
-    "order4": {"volume": 0.10, "sl_points": 500, "tp_points": 2500},
+    "order1": {"volume": 0.10, "sl_points": 3000, "tp_points": 1000, "sl_candle": 3},
+    "order2": {"volume": 0.10, "sl_points": 3000, "tp_points": 1500, "sl_candle": 3},
+    "order3": {"volume": 0.10, "sl_points": 3000, "tp_points": 2000, "sl_candle": 3},
+    "order4": {"volume": 0.10, "sl_points": 3000, "tp_points": 2500, "sl_candle": 3},
 }
 
 
@@ -72,6 +72,9 @@ def load_config():
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
+                print(
+                    f"load_config: 读取到的配置文件SYMBOLS = {config.get('SYMBOLS', '未找到')}"
+                )  # 调试信息
 
                 # 更新全局变量
                 global SYMBOLS, DEFAULT_TIMEFRAME, Delta_TIMEZONE, TRADING_DAY_RESET_HOUR
@@ -79,7 +82,10 @@ def load_config():
                 global BREAKOUT_SETTINGS
 
                 if "SYMBOLS" in config:
-                    SYMBOLS = config["SYMBOLS"]
+                    # 清空当前列表并扩展，而不是直接赋值
+                    SYMBOLS.clear()
+                    SYMBOLS.extend(config["SYMBOLS"])
+                    print(f"load_config: 加载后SYMBOLS = {SYMBOLS}")  # 调试信息
                 if "DEFAULT_TIMEFRAME" in config:
                     DEFAULT_TIMEFRAME = config["DEFAULT_TIMEFRAME"]
                 if "Delta_TIMEZONE" in config:
@@ -100,6 +106,10 @@ def load_config():
                     BATCH_ORDER_DEFAULTS.update(config["BATCH_ORDER_DEFAULTS"])
 
                 return config
+        else:
+            print(f"配置文件不存在，将使用默认配置")
+            # 如果配置文件不存在，保存当前默认配置
+            save_config()
         return {}
     except Exception as e:
         print(f"加载配置出错：{str(e)}")
@@ -114,8 +124,10 @@ def save_config():
         是否保存成功
     """
     try:
+        print(f"save_config: 保存前SYMBOLS = {SYMBOLS}")  # 调试信息
+
         config = {
-            "SYMBOLS": SYMBOLS,
+            "SYMBOLS": SYMBOLS.copy(),  # 使用copy确保不会有引用问题
             "DEFAULT_TIMEFRAME": DEFAULT_TIMEFRAME,
             "Delta_TIMEZONE": Delta_TIMEZONE,
             "TRADING_DAY_RESET_HOUR": TRADING_DAY_RESET_HOUR,
@@ -130,6 +142,14 @@ def save_config():
         config_path = get_config_path()
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=4, ensure_ascii=False)
+
+        # 验证保存是否成功
+        with open(config_path, "r", encoding="utf-8") as f:
+            saved_config = json.load(f)
+            print(
+                f"save_config: 文件中的SYMBOLS = {saved_config.get('SYMBOLS', '未找到')}"
+            )  # 调试信息
+
         return True
     except Exception as e:
         print(f"保存配置出错：{str(e)}")
@@ -137,4 +157,5 @@ def save_config():
 
 
 # 加载配置
+print("config/loader.py模块被导入，执行load_config()")
 load_config()

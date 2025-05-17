@@ -1,8 +1,8 @@
 {
     "SYMBOLS": [
         "BTCUSD",
-        "NAS100",
-        "XAUUSD"
+        "XAUUSD",
+        "NAS100"
     ],
     "DEFAULT_TIMEFRAME": "M1",
     "Delta_TIMEZONE": -3,
@@ -18,7 +18,7 @@
     },
     "SL_MODE": {
         "DEFAULT_MODE": "CANDLE_KEY_LEVEL",
-        "CANDLE_LOOKBACK": 6
+        "CANDLE_LOOKBACK": 3000
     },
     "BREAKOUT_SETTINGS": {
         "HIGH_OFFSET_POINTS": 10,
@@ -28,23 +28,27 @@
     "BATCH_ORDER_DEFAULTS": {
         "order1": {
             "volume": 0.01,
-            "sl_points": 6,
-            "tp_points": 50000
+            "sl_points": 3000,
+            "tp_points": 50000,
+            "sl_candle": 3
         },
         "order2": {
             "volume": 0.01,
-            "sl_points": 6,
-            "tp_points": 50000
+            "sl_points": 3000,
+            "tp_points": 50000,
+            "sl_candle": 3
         },
         "order3": {
             "volume": 0.01,
-            "sl_points": 6,
-            "tp_points": 50000
+            "sl_points": 3000,
+            "tp_points": 50000,
+            "sl_candle": 3
         },
         "order4": {
             "volume": 0.01,
-            "sl_points": 6,
-            "tp_points": 50000
+            "sl_points": 3000,
+            "tp_points": 50000,
+            "sl_candle": 3
         }
     }
 }
