@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
     QSpinBox,
 )
-from config.loader import BATCH_ORDER_DEFAULTS, SL_MODE
+from config.loader import BATCH_ORDER_DEFAULTS, SL_MODE, save_config
 
 
 # 全局变量，用于存储当前实例
@@ -52,6 +52,8 @@ class BatchOrderSection:
             volume_input.setRange(0.01, 100)
             volume_input.setSingleStep(0.01)
             volume_input.setValue(BATCH_ORDER_DEFAULTS[f"order{i}"]["volume"])
+            # 连接信号以自动保存设置
+            volume_input.valueChanged.connect(self.save_batch_settings)
             self.volume_inputs.append(volume_input)
 
             # 止损点数/K线个数
@@ -61,6 +63,8 @@ class BatchOrderSection:
             sl_points_input = QSpinBox()
             sl_points_input.setRange(0, 100000)
             sl_points_input.setValue(BATCH_ORDER_DEFAULTS[f"order{i}"]["sl_points"])
+            # 连接信号以自动保存设置
+            sl_points_input.valueChanged.connect(self.save_batch_settings)
             self.sl_points_inputs.append(sl_points_input)
 
             # K线回溯数量输入（初始隐藏）
@@ -72,6 +76,8 @@ class BatchOrderSection:
                     "sl_candle", SL_MODE["CANDLE_LOOKBACK"]
                 )
             )
+            # 连接信号以自动保存设置
+            sl_candle_input.valueChanged.connect(self.save_batch_settings)
             sl_candle_input.setVisible(False)  # 初始隐藏
             self.sl_candle_inputs.append(sl_candle_input)
 
@@ -79,6 +85,8 @@ class BatchOrderSection:
             tp_points_input = QSpinBox()
             tp_points_input.setRange(0, 100000)
             tp_points_input.setValue(BATCH_ORDER_DEFAULTS[f"order{i}"]["tp_points"])
+            # 连接信号以自动保存设置
+            tp_points_input.valueChanged.connect(self.save_batch_settings)
             self.tp_points_inputs.append(tp_points_input)
 
             order_layout.addWidget(QLabel("手数:"))
@@ -93,6 +101,64 @@ class BatchOrderSection:
 
         # 检查当前的止损模式并更新UI
         self.update_sl_mode(SL_MODE["DEFAULT_MODE"])
+
+    def save_batch_settings(self):
+        """实时保存批量订单设置"""
+        try:
+            print("正在保存批量订单设置...")
+            # 更新批量下单默认值
+            for i in range(4):
+                order_key = f"order{i+1}"
+                # 保存当前批量订单值
+                BATCH_ORDER_DEFAULTS[order_key] = {
+                    "volume": self.volume_inputs[i].value(),
+                    "sl_points": self.sl_points_inputs[i].value(),
+                    "tp_points": self.tp_points_inputs[i].value(),
+                    "sl_candle": self.sl_candle_inputs[i].value(),
+                }
+                # 打印调试信息
+                print(
+                    f"批量订单{i+1}设置: 手数={self.volume_inputs[i].value()}, "
+                    f"止损点数={self.sl_points_inputs[i].value()}, "
+                    f"止盈点数={self.tp_points_inputs[i].value()}, "
+                    f"K线回溯={self.sl_candle_inputs[i].value()}"
+                )
+
+            # 保存配置到文件
+            result = save_config()
+            if result:
+                print("批量订单设置已成功保存")
+
+                # 重新加载配置以确保内存和UI一致
+                from config.loader import (
+                    load_config,
+                    BATCH_ORDER_DEFAULTS as updated_defaults,
+                )
+
+                load_config()
+
+                # 验证配置是否真正保存并加载
+                for i in range(4):
+                    order_key = f"order{i+1}"
+                    expected_volume = self.volume_inputs[i].value()
+                    actual_volume = updated_defaults[order_key].get("volume")
+
+                    if (
+                        abs(expected_volume - actual_volume) > 0.001
+                    ):  # 使用误差范围比较浮点数
+                        print(
+                            f"警告: {order_key}手数值不一致, UI:{expected_volume}, 内存:{actual_volume}"
+                        )
+                        # 将UI值强制设置为内存中的值以确保一致性
+                        self.volume_inputs[i].setValue(actual_volume)
+                    else:
+                        print(f"{order_key}手数保存成功: {actual_volume}")
+            else:
+                print("批量订单设置保存失败")
+            return result
+        except Exception as e:
+            print(f"保存批量订单设置失败: {e}")
+            return False
 
     def update_sl_mode(self, mode):
         """

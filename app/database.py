@@ -19,11 +19,13 @@ class TradeDatabase:
         """初始化数据库"""
         self.db_path = get_data_path("trade_history.db")
         self.conn = None
+        print(f"初始化交易数据库: {self.db_path}")
         self.create_tables()
 
     def create_tables(self):
         """创建数据库表"""
         try:
+            print(f"连接数据库并创建表: {self.db_path}")
             self.conn = sqlite3.connect(self.db_path)
             cursor = self.conn.cursor()
 
@@ -51,8 +53,17 @@ class TradeDatabase:
             )
 
             self.conn.commit()
+            print("数据库表创建成功")
+
+            # 检查数据库是否包含今日交易记录
+            today = self.get_trading_day()
+            cursor.execute("SELECT count FROM trade_count WHERE date = ?", (today,))
+            result = cursor.fetchone()
+            print(f"今日({today})交易记录: {result}")
+
         except Exception as e:
             logging.error(f"创建数据库表出错: {str(e)}")
+            print(f"创建数据库表出错: {str(e)}")
         finally:
             if self.conn:
                 self.conn.close()
@@ -74,15 +85,19 @@ class TradeDatabase:
         """获取今日交易次数"""
         today = self.get_trading_day()
         try:
+            print(f"正在获取今日({today})交易次数，数据库路径: {self.db_path}")
             self.conn = sqlite3.connect(self.db_path)
             cursor = self.conn.cursor()
             cursor.execute("SELECT count FROM trade_count WHERE date = ?", (today,))
             result = cursor.fetchone()
             if result:
+                print(f"数据库中今日交易次数: {result[0]}")
                 return result[0]
+            print("数据库中今日无交易记录")
             return 0
         except Exception as e:
             logging.error(f"获取今日交易次数出错: {str(e)}")
+            print(f"获取今日交易次数出错: {str(e)}")
             return 0
         finally:
             if self.conn:

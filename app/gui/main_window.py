@@ -25,7 +25,7 @@ import os
 from utils.paths import get_icon_path, get_font_path
 from app.trader import MT5Trader
 from app.database import TradeDatabase
-from config.loader import GUI_SETTINGS, SL_MODE, SYMBOLS, load_config
+from config.loader import GUI_SETTINGS, SL_MODE, SYMBOLS, load_config, DAILY_TRADE_LIMIT
 from app.gui.account_info import AccountInfoSection
 from app.gui.pnl_info import PnlInfoSection
 from app.gui.countdown import CountdownSection
@@ -58,6 +58,10 @@ class MT5GUI(QMainWindow):
         # 确保在初始化前加载最新配置
         print(f"MT5GUI初始化前SYMBOLS = {SYMBOLS}")
         load_config()
+
+        # 重要：打印交易次数限制配置
+        print(f"MT5GUI初始化 - 当前DAILY_TRADE_LIMIT = {DAILY_TRADE_LIMIT}")
+
         print(f"MT5GUI初始化后SYMBOLS = {SYMBOLS}")
 
         self.trader = None
@@ -448,8 +452,52 @@ class MT5GUI(QMainWindow):
 
         update_sl_mode(SL_MODE["DEFAULT_MODE"])
 
+        # 重新加载交易限制设置
+        self.update_trading_limits()
+
+        # 立即更新交易次数显示
+        if self.trader and self.trader.is_connected():
+            account_info = self.components["account_info"]
+            account_info.update_trade_count_display(self.db)
+            print("已更新交易次数显示")
+
         # 更新状态栏提示
         self.status_bar.showMessage("配置已更新")
+
+    def update_trading_limits(self):
+        """重新加载并应用交易限制设置"""
+        # 重新加载配置
+        from config.loader import load_config, DAILY_TRADE_LIMIT, get_config_path
+        import json
+
+        # 先直接从文件读取最新值
+        try:
+            config_path = get_config_path()
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                file_limit = config.get("DAILY_TRADE_LIMIT")
+                print(f"从配置文件读取到DAILY_TRADE_LIMIT = {file_limit}")
+        except Exception as e:
+            print(f"读取配置文件失败: {e}")
+
+        # 再次加载配置以更新内存中的值
+        load_config()
+
+        # 打印更新后的值
+        from config.loader import DAILY_TRADE_LIMIT as updated_limit
+
+        print(f"内存中更新后的DAILY_TRADE_LIMIT = {updated_limit}")
+
+        # 检查是否真的更新了
+        if "file_limit" in locals() and file_limit != updated_limit:
+            print(
+                f"警告: 文件中的值({file_limit})与更新后内存中的值({updated_limit})不一致!"
+            )
+
+        # 立即更新界面显示
+        if self.trader and self.trader.is_connected():
+            account_info = self.components["account_info"]
+            account_info.update_trade_count_display(self.db)
 
     def show_about(self):
         """显示关于对话框"""

@@ -10,6 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 import urllib.request
+import json
 
 
 def ensure_icon_exists():
@@ -48,6 +49,116 @@ def ensure_icon_exists():
         return False
 
 
+def verify_config():
+    """验证配置文件是否存在且有效，如果不存在则创建默认配置"""
+    try:
+        config_path = Path("config/config.json")
+        if not config_path.exists():
+            # 从配置加载器导入默认设置
+            print("配置文件不存在，将创建默认配置")
+            sys.path.append(".")
+            from config.loader import (
+                SYMBOLS,
+                DEFAULT_TIMEFRAME,
+                Delta_TIMEZONE,
+                TRADING_DAY_RESET_HOUR,
+                DAILY_LOSS_LIMIT,
+                DAILY_TRADE_LIMIT,
+                GUI_SETTINGS,
+                SL_MODE,
+                BREAKOUT_SETTINGS,
+                BATCH_ORDER_DEFAULTS,
+            )
+
+            # 创建默认配置
+            default_config = {
+                "SYMBOLS": SYMBOLS.copy(),
+                "DEFAULT_TIMEFRAME": DEFAULT_TIMEFRAME,
+                "Delta_TIMEZONE": Delta_TIMEZONE,
+                "TRADING_DAY_RESET_HOUR": TRADING_DAY_RESET_HOUR,
+                "DAILY_LOSS_LIMIT": DAILY_LOSS_LIMIT,
+                "DAILY_TRADE_LIMIT": DAILY_TRADE_LIMIT,
+                "GUI_SETTINGS": GUI_SETTINGS,
+                "SL_MODE": SL_MODE,
+                "BREAKOUT_SETTINGS": BREAKOUT_SETTINGS,
+                "BATCH_ORDER_DEFAULTS": BATCH_ORDER_DEFAULTS,
+            }
+
+            # 确保config目录存在
+            config_path.parent.mkdir(exist_ok=True)
+
+            # 保存默认配置
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(default_config, f, indent=4, ensure_ascii=False)
+
+            print(f"已创建默认配置文件: {config_path}")
+        else:
+            # 验证配置文件格式
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                print(
+                    f"验证配置文件成功，当前DAILY_TRADE_LIMIT: {config.get('DAILY_TRADE_LIMIT', '未设置')}"
+                )
+
+                # 确保配置文件包含必要的字段
+                required_fields = [
+                    "SYMBOLS",
+                    "DEFAULT_TIMEFRAME",
+                    "DAILY_TRADE_LIMIT",
+                    "DAILY_LOSS_LIMIT",
+                    "GUI_SETTINGS",
+                    "SL_MODE",
+                    "BREAKOUT_SETTINGS",
+                    "BATCH_ORDER_DEFAULTS",
+                ]
+
+                missing_fields = [
+                    field for field in required_fields if field not in config
+                ]
+                if missing_fields:
+                    print(f"配置文件缺少必要字段: {missing_fields}")
+
+                    # 更新缺失的字段
+                    from config.loader import (
+                        SYMBOLS,
+                        DEFAULT_TIMEFRAME,
+                        Delta_TIMEZONE,
+                        TRADING_DAY_RESET_HOUR,
+                        DAILY_LOSS_LIMIT,
+                        DAILY_TRADE_LIMIT,
+                        GUI_SETTINGS,
+                        SL_MODE,
+                        BREAKOUT_SETTINGS,
+                        BATCH_ORDER_DEFAULTS,
+                    )
+
+                    for field in missing_fields:
+                        if field == "SYMBOLS":
+                            config["SYMBOLS"] = SYMBOLS.copy()
+                        elif field == "DEFAULT_TIMEFRAME":
+                            config["DEFAULT_TIMEFRAME"] = DEFAULT_TIMEFRAME
+                        elif field == "DAILY_LOSS_LIMIT":
+                            config["DAILY_LOSS_LIMIT"] = DAILY_LOSS_LIMIT
+                        elif field == "DAILY_TRADE_LIMIT":
+                            config["DAILY_TRADE_LIMIT"] = DAILY_TRADE_LIMIT
+                        elif field == "GUI_SETTINGS":
+                            config["GUI_SETTINGS"] = GUI_SETTINGS
+                        elif field == "SL_MODE":
+                            config["SL_MODE"] = SL_MODE
+                        elif field == "BREAKOUT_SETTINGS":
+                            config["BREAKOUT_SETTINGS"] = BREAKOUT_SETTINGS
+                        elif field == "BATCH_ORDER_DEFAULTS":
+                            config["BATCH_ORDER_DEFAULTS"] = BATCH_ORDER_DEFAULTS
+
+                    # 保存更新后的配置
+                    with open(config_path, "w", encoding="utf-8") as f:
+                        json.dump(config, f, indent=4, ensure_ascii=False)
+
+                    print(f"已更新配置文件: {config_path}")
+    except Exception as e:
+        print(f"验证配置文件失败: {e}")
+
+
 def build_exe():
     """将项目打包成可执行文件"""
     print("开始打包MT5交易系统...")
@@ -80,6 +191,9 @@ def build_exe():
     # 确保有有效的图标文件
     ensure_icon_exists()
 
+    # 确保配置文件有效
+    verify_config()
+
     # 图标的绝对路径
     icon_path = os.path.abspath("resources/icons/icon.ico")
     print(f"使用图标: {icon_path}")
@@ -101,6 +215,9 @@ def build_exe():
         # 添加资源文件夹
         "--add-data",
         f"resources{separator}resources",
+        # 添加配置文件夹
+        "--add-data",
+        f"config{separator}config",
         "main.py",  # 入口脚本
     ]
 
@@ -135,6 +252,123 @@ def build_exe():
             shutil.rmtree(dst_config)
         shutil.copytree(config_dir, dst_config)
         print(f"已复制配置目录: {config_dir} -> {dst_config}")
+
+        # 确保配置文件权限正确（可写）
+        config_file = dst_config / "config.json"
+        if config_file.exists():
+            if sys.platform.startswith("win"):
+                try:
+                    import stat
+
+                    # 在Windows上设置为可读写
+                    os.chmod(config_file, stat.S_IWRITE | stat.S_IREAD)
+                    print(f"已设置配置文件权限: {config_file}")
+
+                    # 额外检查权限
+                    try:
+                        # 尝试写入配置文件验证权限
+                        with open(config_file, "r", encoding="utf-8") as f:
+                            config_content = json.load(f)
+
+                        # 无修改地写回配置
+                        with open(config_file, "w", encoding="utf-8") as f:
+                            json.dump(config_content, f, indent=4, ensure_ascii=False)
+
+                        print(f"配置文件权限验证成功: {config_file}")
+                    except Exception as perm_e:
+                        print(f"配置文件权限验证失败: {perm_e}")
+
+                except Exception as e:
+                    print(f"设置配置文件权限时出错: {e}")
+            else:
+                # 在类Unix系统上设置为可读写
+                try:
+                    os.chmod(config_file, 0o644)  # rw-r--r--
+                    print(f"在非Windows系统设置配置文件权限: {config_file}")
+                except Exception as e:
+                    print(f"设置配置文件权限时出错: {e}")
+
+    # 创建data目录并复制数据库文件
+    data_dir = Path("data")
+    dst_data = dist_dir / "data"
+    if not dst_data.exists():
+        dst_data.mkdir(exist_ok=True)
+        print(f"已创建数据目录: {dst_data}")
+
+    # 如果是第一次创建，添加一个空的readme文件说明目录用途
+    readme_file = dst_data / "README.txt"
+    if not readme_file.exists():
+        with open(readme_file, "w", encoding="utf-8") as f:
+            f.write(
+                "此目录用于存储交易数据和历史记录。请勿手动删除或修改此目录下的文件。"
+            )
+        print(f"已创建数据目录说明文件: {readme_file}")
+
+    # 如果开发环境中存在数据库文件，复制到打包目录
+    db_file = data_dir / "trade_history.db"
+    if db_file.exists():
+        dst_db = dst_data / "trade_history.db"
+        shutil.copy(db_file, dst_db)
+        print(f"已复制数据库文件: {db_file} -> {dst_db}")
+
+        # 确保数据库文件权限正确（可读写）
+        try:
+            if sys.platform.startswith("win"):
+                import stat
+
+                os.chmod(dst_db, stat.S_IWRITE | stat.S_IREAD)
+            else:
+                os.chmod(dst_db, 0o644)  # rw-r--r--
+            print(f"已设置数据库文件权限: {dst_db}")
+        except Exception as e:
+            print(f"设置数据库文件权限时出错: {e}")
+    else:
+        # 如果开发环境中不存在数据库文件，创建一个新的空数据库
+        try:
+            import sqlite3
+
+            dst_db = dst_data / "trade_history.db"
+            conn = sqlite3.connect(dst_db)
+            cursor = conn.cursor()
+
+            # 创建基本表结构
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS trade_count (
+                    id INTEGER PRIMARY KEY,
+                    date TEXT,
+                    count INTEGER
+                )
+                """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS risk_events (
+                    id INTEGER PRIMARY KEY,
+                    timestamp TEXT,
+                    event_type TEXT,
+                    details TEXT
+                )
+                """
+            )
+
+            conn.commit()
+            conn.close()
+
+            print(f"已创建新的空数据库文件: {dst_db}")
+
+            # 设置适当的权限
+            if sys.platform.startswith("win"):
+                import stat
+
+                os.chmod(dst_db, stat.S_IWRITE | stat.S_IREAD)
+            else:
+                os.chmod(dst_db, 0o644)  # rw-r--r--
+        except Exception as e:
+            print(f"创建新数据库失败: {e}")
+
+        print(f"开发环境中不存在数据库文件: {db_file}，已创建新的空数据库")
 
     # 额外检查，确保EXE中包含了图标
     try:

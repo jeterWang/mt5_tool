@@ -6,6 +6,7 @@
 
 from PyQt6.QtWidgets import QHBoxLayout, QLabel
 from config.loader import DAILY_TRADE_LIMIT
+import os
 
 
 class AccountInfoSection:
@@ -64,9 +65,36 @@ class AccountInfoSection:
         Args:
             db: 数据库对象
         """
+        # 重新从配置文件加载最新的DAILY_TRADE_LIMIT
+        from config.loader import get_config_path, load_config
+        import json
+
+        # 先重新加载配置
+        load_config()
+        # 再导入最新值
+        from config.loader import DAILY_TRADE_LIMIT
+
+        # 打印数据库路径
+        if hasattr(db, "db_path"):
+            print(f"数据库路径: {db.db_path}")
+            print(f"数据库文件是否存在: {os.path.exists(db.db_path)}")
+
+        # 获取今日实际交易次数
         count = db.get_today_count()
+        print(f"数据库中获取到的今日交易次数: {count}")
+
+        # 计算剩余交易次数
         remaining = max(0, DAILY_TRADE_LIMIT - count)
-        self.trade_count_label.setText(f"今日剩余交易次数: {remaining}")
+        # 更新UI显示，同时显示总限制和已用次数
+        self.trade_count_label.setText(
+            f"今日剩余交易次数: {remaining} ({count}/{DAILY_TRADE_LIMIT})"
+        )
+
+        # 调试信息
+        print(
+            f"更新剩余交易次数显示: 当前DAILY_TRADE_LIMIT={DAILY_TRADE_LIMIT}, 已交易={count}, 剩余={remaining}"
+        )
+
         if remaining == 0:
             self.trade_count_label.setStyleSheet(
                 "QLabel { color: red; font-weight: bold; }"

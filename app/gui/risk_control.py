@@ -8,6 +8,7 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta
 import winsound
+import json
 
 from utils.paths import get_data_path
 from config.loader import (
@@ -15,6 +16,7 @@ from config.loader import (
     DAILY_TRADE_LIMIT,
     TRADING_DAY_RESET_HOUR,
     GUI_SETTINGS,
+    get_config_path,
 )
 
 
@@ -30,12 +32,53 @@ def check_trade_limit(db, gui_window):
         bool: 是否允许继续交易
     """
     try:
+        # 重新从配置文件加载最新的DAILY_TRADE_LIMIT
+        from config.loader import DAILY_TRADE_LIMIT, load_config, get_config_path
+
+        # 先执行一次load_config确保内存中的值是最新的
+        load_config()
+
+        # 直接从配置文件读取，确保获取最新值
+        config_path = get_config_path()
+        print(f"检查交易次数限制，配置文件路径: {config_path}")
+
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                file_limit = config.get("DAILY_TRADE_LIMIT", DAILY_TRADE_LIMIT)
+                print(f"从配置文件读取DAILY_TRADE_LIMIT = {file_limit}")
+        except Exception as e:
+            print(f"读取配置文件出错: {str(e)}, 使用内存中的值: {DAILY_TRADE_LIMIT}")
+            file_limit = DAILY_TRADE_LIMIT
+
+        # 比较内存中的值和文件中的值，如果不一致则使用文件中的值
+        if DAILY_TRADE_LIMIT != file_limit:
+            print(
+                f"警告：内存中的DAILY_TRADE_LIMIT({DAILY_TRADE_LIMIT})与文件中的值({file_limit})不一致"
+            )
+            # 使用文件中的值
+            limit_to_use = file_limit
+        else:
+            limit_to_use = DAILY_TRADE_LIMIT
+
+        print(f"检查交易次数限制，当前设置为: {limit_to_use}")
+
+        # 获取今日实际交易次数
         count = db.get_today_count()
-        if count >= DAILY_TRADE_LIMIT:
-            gui_window.status_bar.showMessage("已达到每日交易次数限制！")
+        print(f"今日已交易次数: {count}, 最大允许次数: {limit_to_use}")
+
+        if count >= limit_to_use:
+            message = f"已达到每日交易次数限制({count}/{limit_to_use})！"
+            gui_window.status_bar.showMessage(message)
+            print(message)
             # 播放警告声音
             winsound.Beep(1000, 1000)  # 频率1000，持续1秒
             return False
+
+        # 更新界面显示
+        account_info = gui_window.components["account_info"]
+        account_info.update_trade_count_display(db)
+
         return True
     except Exception as e:
         print(f"检查交易次数限制出错: {str(e)}")

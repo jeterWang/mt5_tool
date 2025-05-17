@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('C:\\Users\\76090\\codes\\python\\mt5\\resources\\icons\\icon.ico', 'resources/icons/'), ('resources', 'resources')],
+    datas=[('C:\\Users\\76090\\codes\\python\\mt5\\resources\\icons\\icon.ico', 'resources/icons/'), ('resources', 'resources'), ('config', 'config')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
