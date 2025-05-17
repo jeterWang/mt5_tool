@@ -1,0 +1,131 @@
+"""
+风控模块
+
+提供交易系统的风控功能，包括交易次数限制和亏损控制
+"""
+
+import os
+import pandas as pd
+from datetime import datetime, timedelta
+import winsound
+
+from utils.paths import get_data_path
+from config.loader import (
+    DAILY_LOSS_LIMIT,
+    DAILY_TRADE_LIMIT,
+    TRADING_DAY_RESET_HOUR,
+    GUI_SETTINGS,
+)
+
+
+def check_trade_limit(db, gui_window):
+    """
+    检查是否超过每日交易限制
+
+    Args:
+        db: TradeDatabase实例
+        gui_window: 主窗口实例
+
+    Returns:
+        bool: 是否允许继续交易
+    """
+    try:
+        count = db.get_today_count()
+        if count >= DAILY_TRADE_LIMIT:
+            gui_window.status_bar.showMessage("已达到每日交易次数限制！")
+            # 播放警告声音
+            winsound.Beep(1000, 1000)  # 频率1000，持续1秒
+            return False
+        return True
+    except Exception as e:
+        print(f"检查交易次数限制出错: {str(e)}")
+        return True  # 出错时允许继续交易，避免错误阻止用户交易
+
+
+def increment_trade_count(db, gui_window):
+    """
+    增加交易次数计数
+
+    Args:
+        db: TradeDatabase实例
+        gui_window: 主窗口实例
+    """
+    if db.increment_count():
+        # 更新主界面上的交易次数显示
+        account_info = gui_window.components["account_info"]
+        account_info.update_trade_count_display(db)
+
+
+def check_daily_loss_limit(trader, db, gui_window):
+    """
+    检查是否超过日内最大亏损，超过则自动平仓并禁止交易
+
+    Args:
+        trader: MT5Trader实例
+        db: TradeDatabase实例
+        gui_window: 主窗口实例
+
+    Returns:
+        bool: 是否允许继续交易
+    """
+    try:
+        # 1. 统计今日已实现亏损（从trade_records.xlsx）
+        today = get_trading_day()
+        realized_loss = 0
+        data_dir = get_data_path()
+        file_path = os.path.join(data_dir, "trade_records.xlsx")
+        account_id = trader._get_account_id() if trader else "unknown"
+
+        if os.path.exists(file_path):
+            try:
+                df = pd.read_excel(file_path, sheet_name=str(account_id))
+                # 优先使用trading_day字段，如果没有再使用close_time
+                if "trading_day" in df.columns and "profit" in df.columns:
+                    df_today = df[df["trading_day"] == today]
+                    realized_loss = df_today["profit"].sum()
+                elif "close_time" in df.columns and "profit" in df.columns:
+                    # 兼容旧数据格式
+                    df_today = df[df["close_time"].astype(str).str.startswith(today)]
+                    realized_loss = df_today["profit"].sum()
+            except Exception as e:
+                print(f"读取已实现盈亏数据出错: {str(e)}")
+                pass
+
+        # 2. 统计当前未实现浮动盈亏
+        unrealized = 0
+        if trader and trader.is_connected():
+            positions = trader.get_all_positions()
+            if positions:
+                unrealized = sum([p["profit"] for p in positions])
+
+        # 3. 合计
+        total = realized_loss + unrealized
+        if total <= -DAILY_LOSS_LIMIT:
+            # 超过最大亏损，自动平仓并禁止交易
+            gui_window.components["trading_buttons"].close_all_positions()
+            gui_window.disable_trading_for_today()
+            # 记录风控事件
+            detail = f"日内亏损已达{total:.2f}，已自动平仓并禁止交易"
+            db.record_risk_event("DAILY_LOSS_LIMIT", detail)
+            gui_window.status_bar.showMessage(detail)
+            return False
+        return True
+    except Exception as e:
+        print(f"风控检查出错：{str(e)}")
+        return True  # 出错时允许继续交易，避免错误阻止用户交易
+
+
+def get_trading_day():
+    """
+    获取当前交易日，考虑重置时间
+
+    Returns:
+        交易日期字符串，格式为YYYY-MM-DD
+    """
+    now = datetime.now()
+    # 如果当前时间已经过了重置时间，使用当天日期，否则使用前一天日期
+    if now.hour >= TRADING_DAY_RESET_HOUR:
+        return now.strftime("%Y-%m-%d")
+    else:
+        yesterday = now - timedelta(days=1)
+        return yesterday.strftime("%Y-%m-%d")
