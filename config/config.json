@@ -1,6 +1,6 @@
 {
     "SYMBOLS": [
-        "BTCUSD",
+        "USTECm",
         "XAUUSD",
         "NAS100"
     ],
@@ -14,7 +14,8 @@
         "SOUND_ALERT": false,
         "ALERT_SECONDS": 5,
         "BEEP_FREQUENCY": 1000,
-        "BEEP_DURATION": 200
+        "BEEP_DURATION": 200,
+        "BREAKEVEN_OFFSET_POINTS": 100
     },
     "SL_MODE": {
         "DEFAULT_MODE": "CANDLE_KEY_LEVEL",
@@ -27,25 +28,25 @@
     },
     "BATCH_ORDER_DEFAULTS": {
         "order1": {
-            "volume": 0.2,
+            "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3
         },
         "order2": {
-            "volume": 0.2,
+            "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3
         },
         "order3": {
-            "volume": 0.2,
+            "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3
         },
         "order4": {
-            "volume": 0.2,
+            "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3

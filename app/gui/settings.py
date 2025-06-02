@@ -176,11 +176,22 @@ class SettingsDialog(QDialog):
         self.beep_duration_spin.setValue(GUI_SETTINGS["BEEP_DURATION"])
         beep_layout.addWidget(self.beep_duration_spin)
 
+        # 一键保本偏移点数设置
+        breakeven_layout = QHBoxLayout()
+        breakeven_layout.addWidget(QLabel("一键保本偏移点数:"))
+        self.breakeven_offset_spin = QSpinBox()
+        self.breakeven_offset_spin.setRange(-1000, 1000)
+        self.breakeven_offset_spin.setValue(
+            GUI_SETTINGS.get("BREAKEVEN_OFFSET_POINTS", 0)
+        )
+        breakeven_layout.addWidget(self.breakeven_offset_spin)
+
         # 添加所有组件到布局
         layout.addLayout(top_layout)
         layout.addLayout(sound_layout)
         layout.addLayout(alert_layout)
         layout.addLayout(beep_layout)
+        layout.addLayout(breakeven_layout)
         layout.addStretch()
 
         # 添加到标签页
@@ -378,75 +389,8 @@ class SettingsDialog(QDialog):
 
     def save_settings(self):
         """保存所有设置到配置文件"""
-        # 声明全局变量
-        global SYMBOLS, DEFAULT_TIMEFRAME, Delta_TIMEZONE, TRADING_DAY_RESET_HOUR
-        global DAILY_LOSS_LIMIT, DAILY_TRADE_LIMIT, GUI_SETTINGS, SL_MODE, BREAKOUT_SETTINGS
-        global BATCH_ORDER_DEFAULTS
-
-        print(f"保存前SYMBOLS: {SYMBOLS}")  # 调试信息
-        print(f"保存前DAILY_TRADE_LIMIT: {DAILY_TRADE_LIMIT}")  # 调试信息
-
-        # 检查当前标签页，如果是高级设置，则尝试从JSON编辑器保存
-        if self.tab_widget.currentIndex() == 4:  # 高级设置标签页
-            try:
-                json_text = self.json_editor.toPlainText()
-                config_data = json.loads(json_text)
-
-                # 更新全局变量
-                if "SYMBOLS" in config_data:
-                    SYMBOLS.clear()
-                    SYMBOLS.extend(config_data["SYMBOLS"])
-                if "DEFAULT_TIMEFRAME" in config_data:
-                    DEFAULT_TIMEFRAME = config_data["DEFAULT_TIMEFRAME"]
-                if "Delta_TIMEZONE" in config_data:
-                    Delta_TIMEZONE = config_data["Delta_TIMEZONE"]
-                if "TRADING_DAY_RESET_HOUR" in config_data:
-                    TRADING_DAY_RESET_HOUR = config_data["TRADING_DAY_RESET_HOUR"]
-                if "DAILY_LOSS_LIMIT" in config_data:
-                    DAILY_LOSS_LIMIT = config_data["DAILY_LOSS_LIMIT"]
-                if "DAILY_TRADE_LIMIT" in config_data:
-                    DAILY_TRADE_LIMIT = config_data["DAILY_TRADE_LIMIT"]
-                if "GUI_SETTINGS" in config_data:
-                    GUI_SETTINGS.update(config_data["GUI_SETTINGS"])
-                if "SL_MODE" in config_data:
-                    SL_MODE.update(config_data["SL_MODE"])
-                if "BREAKOUT_SETTINGS" in config_data:
-                    BREAKOUT_SETTINGS.update(config_data["BREAKOUT_SETTINGS"])
-                if "BATCH_ORDER_DEFAULTS" in config_data:
-                    BATCH_ORDER_DEFAULTS.update(config_data["BATCH_ORDER_DEFAULTS"])
-
-                # 保存到配置文件
-                config_path = get_config_path()
-                with open(config_path, "w", encoding="utf-8") as f:
-                    json.dump(config_data, f, indent=4, ensure_ascii=False)
-
-                print(f"高级设置保存后SYMBOLS: {SYMBOLS}")  # 调试信息
-                print(
-                    f"高级设置保存后DAILY_TRADE_LIMIT: {DAILY_TRADE_LIMIT}"
-                )  # 调试信息
-
-                # 验证保存后的配置
-                try:
-                    with open(config_path, "r", encoding="utf-8") as f:
-                        saved_config = json.load(f)
-                        print(
-                            f"文件中的SYMBOLS: {saved_config.get('SYMBOLS', '未找到')}"
-                        )  # 调试信息
-                        print(
-                            f"文件中的DAILY_TRADE_LIMIT: {saved_config.get('DAILY_TRADE_LIMIT', '未找到')}"
-                        )  # 调试信息
-                except Exception as e:
-                    print(f"验证配置时出错: {str(e)}")
-
-                QMessageBox.information(self, "保存成功", "配置已保存!")
-                self.accept()
-                return
-            except Exception as e:
-                QMessageBox.critical(self, "保存失败", f"保存配置出错: {str(e)}")
-                return
-
-        # 从各个标签页收集设置
         try:
+            # 1. 基本设置
             # 收集交易品种
             symbols = []
             for i in range(self.symbols_table.rowCount()):
@@ -454,33 +398,30 @@ class SettingsDialog(QDialog):
                 if item and item.text().strip():
                     symbols.append(item.text().strip())
 
-            print(f"表格中收集到的SYMBOLS: {symbols}")  # 调试信息
-
             # 保存前先清空当前SYMBOLS，确保删除的品种不会保留
             SYMBOLS.clear()
             # 使用extend而不是赋值，确保引用不变
             SYMBOLS.extend(symbols)
 
-            print(f"清空并添加后SYMBOLS: {SYMBOLS}")  # 调试信息
-
+            # 默认时间周期
             DEFAULT_TIMEFRAME = self.timeframe_combo.currentText()
+
+            # 时区差值
             Delta_TIMEZONE = self.timezone_spin.value()
+
+            # 交易日重置时间
             TRADING_DAY_RESET_HOUR = self.reset_spin.value()
 
-            # GUI设置
+            # 2. GUI设置
             GUI_SETTINGS["WINDOW_TOP"] = self.window_top_check.isChecked()
             GUI_SETTINGS["SOUND_ALERT"] = self.sound_alert_check.isChecked()
             GUI_SETTINGS["ALERT_SECONDS"] = self.alert_seconds_spin.value()
             GUI_SETTINGS["BEEP_FREQUENCY"] = self.beep_freq_spin.value()
             GUI_SETTINGS["BEEP_DURATION"] = self.beep_duration_spin.value()
+            GUI_SETTINGS["BREAKEVEN_OFFSET_POINTS"] = self.breakeven_offset_spin.value()
 
-            # 交易设置
-            DAILY_LOSS_LIMIT = self.loss_limit_spin.value()
-            # 先保存spin中的值到临时变量
-            trade_limit_value = self.trade_limit_spin.value()
-            DAILY_TRADE_LIMIT = trade_limit_value
-            print(f"更新后DAILY_TRADE_LIMIT: {DAILY_TRADE_LIMIT}")  # 调试信息
-
+            # 3. 交易设置
+            # 止损模式
             SL_MODE["DEFAULT_MODE"] = (
                 "FIXED_POINTS"
                 if self.sl_mode_combo.currentIndex() == 0
@@ -488,11 +429,16 @@ class SettingsDialog(QDialog):
             )
             SL_MODE["CANDLE_LOOKBACK"] = self.candle_lookback_spin.value()
 
+            # 突破设置
             BREAKOUT_SETTINGS["HIGH_OFFSET_POINTS"] = self.high_offset_spin.value()
             BREAKOUT_SETTINGS["LOW_OFFSET_POINTS"] = self.low_offset_spin.value()
             BREAKOUT_SETTINGS["SL_OFFSET_POINTS"] = self.sl_offset_spin.value()
 
-            # 批量下单设置
+            # 4. 风控设置
+            DAILY_LOSS_LIMIT = self.loss_limit_spin.value()
+            DAILY_TRADE_LIMIT = self.trade_limit_spin.value()
+
+            # 5. 批量下单设置
             for i in range(4):
                 order_key = f"order{i+1}"
                 volume_spin = self.batch_table.cellWidget(i, 1)
@@ -500,101 +446,23 @@ class SettingsDialog(QDialog):
                 tp_spin = self.batch_table.cellWidget(i, 3)
                 sl_candle_spin = self.batch_table.cellWidget(i, 4)
 
-                # 检查是否存在sl_candle字段，如果不存在则创建并设置默认值
-                if "sl_candle" not in BATCH_ORDER_DEFAULTS[order_key]:
-                    # 使用SL_MODE["CANDLE_LOOKBACK"]作为默认值
-                    sl_candle_value = SL_MODE["CANDLE_LOOKBACK"]
-                else:
-                    # 从表格中获取值
-                    sl_candle_value = (
-                        sl_candle_spin.value()
-                        if sl_candle_spin
-                        else SL_MODE["CANDLE_LOOKBACK"]
-                    )
-
                 BATCH_ORDER_DEFAULTS[order_key] = {
                     "volume": volume_spin.value(),
                     "sl_points": sl_spin.value(),
                     "tp_points": tp_spin.value(),
-                    "sl_candle": sl_candle_value,
+                    "sl_candle": sl_candle_spin.value(),
                 }
 
-            print(f"调用save_config前SYMBOLS: {SYMBOLS}")  # 调试信息
-            print(
-                f"调用save_config前DAILY_TRADE_LIMIT: {DAILY_TRADE_LIMIT}"
-            )  # 调试信息
+            # 保存到文件
+            success = save_config()
 
-            # 在save_config前创建一个配置字典并手动保存，确保数据正确写入
-            config = {
-                "SYMBOLS": SYMBOLS.copy(),  # 使用copy确保不会有引用问题
-                "DEFAULT_TIMEFRAME": DEFAULT_TIMEFRAME,
-                "Delta_TIMEZONE": Delta_TIMEZONE,
-                "TRADING_DAY_RESET_HOUR": TRADING_DAY_RESET_HOUR,
-                "DAILY_LOSS_LIMIT": DAILY_LOSS_LIMIT,
-                "DAILY_TRADE_LIMIT": trade_limit_value,  # 确保使用spin的值
-                "GUI_SETTINGS": GUI_SETTINGS,
-                "SL_MODE": SL_MODE,
-                "BREAKOUT_SETTINGS": BREAKOUT_SETTINGS,
-                "BATCH_ORDER_DEFAULTS": BATCH_ORDER_DEFAULTS,
-            }
-
-            config_path = get_config_path()
-            print(f"保存配置到: {config_path}")  # 调试信息
-
-            # 确保目录存在
-            config_dir = os.path.dirname(config_path)
-            if not os.path.exists(config_dir):
-                os.makedirs(config_dir, exist_ok=True)
-                print(f"创建目录: {config_dir}")
-
-            # 直接保存配置文件，不使用save_config函数
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
-
-            print(f"直接写入配置后DAILY_TRADE_LIMIT: {config['DAILY_TRADE_LIMIT']}")
-
-            # 重新加载配置，确保内存中的值与文件一致
-            from config.loader import load_config
-
-            load_config()
-
-            # 验证加载后的值
-            from config.loader import DAILY_TRADE_LIMIT as loaded_limit
-
-            print(f"重新加载后DAILY_TRADE_LIMIT: {loaded_limit}")
-
-            # 手动确认保存的数据是否正确写入文件
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    saved_config = json.load(f)
-                    print(
-                        f"文件中的SYMBOLS: {saved_config.get('SYMBOLS', '未找到')}"
-                    )  # 调试信息
-                    print(
-                        f"文件中的DAILY_TRADE_LIMIT: {saved_config.get('DAILY_TRADE_LIMIT', '未找到')}"
-                    )  # 调试信息
-
-                    # 最后再次确认DAILY_TRADE_LIMIT的值与用户设置一致
-                    if saved_config.get("DAILY_TRADE_LIMIT") != trade_limit_value:
-                        print(
-                            f"警告：保存的DAILY_TRADE_LIMIT值不匹配！设置值: {trade_limit_value}, 文件值: {saved_config.get('DAILY_TRADE_LIMIT')}"
-                        )
-                        # 再次尝试强制更新文件
-                        saved_config["DAILY_TRADE_LIMIT"] = trade_limit_value
-                        with open(config_path, "w", encoding="utf-8") as f:
-                            json.dump(saved_config, f, indent=4, ensure_ascii=False)
-                        print(f"已强制更新DAILY_TRADE_LIMIT为: {trade_limit_value}")
-            except Exception as e:
-                print(f"验证配置时出错: {str(e)}")
-                success = False
-
-            QMessageBox.information(self, "保存成功", "配置已保存!")
-            self.accept()
-
+            if success:
+                QMessageBox.information(self, "保存成功", "设置已成功保存")
+                self.accept()
+            else:
+                QMessageBox.warning(self, "保存失败", "配置保存失败，请检查文件权限")
         except Exception as e:
-            print(f"保存过程中出错: {str(e)}")  # 调试信息
-            QMessageBox.critical(self, "保存失败", f"保存配置出错: {str(e)}")
-            return
+            QMessageBox.critical(self, "错误", f"保存设置时出错: {str(e)}")
 
 
 def show_settings_dialog(parent=None):

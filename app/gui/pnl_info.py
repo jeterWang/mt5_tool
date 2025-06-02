@@ -33,46 +33,42 @@ class PnlInfoSection:
 
     def update_daily_pnl_info(self, trader):
         """
-        实时刷新盈亏信息
-
-        Args:
-            trader: 交易者对象
+        更新每日盈亏信息
         """
         try:
-            today = trader.get_trading_day()
-            realized = 0
-            data_dir = get_data_path()
-            file_path = os.path.join(data_dir, "trade_records.xlsx")
-            account_id = trader._get_account_id() if trader else "unknown"
-
-            if os.path.exists(file_path):
+            # 获取当前交易日
+            trading_day = trader.get_trading_day()
+            # 获取账户ID
+            account_id = trader._get_account_id()
+            # 获取Excel文件路径
+            excel_path = os.path.join(get_data_path(), "trade_history.xlsx")
+            # 读取已实现盈亏
+            realized_pnl = 0
+            if os.path.exists(excel_path):
                 try:
-                    df = pd.read_excel(file_path, sheet_name=str(account_id))
-                    # 优先使用trading_day字段，如果没有再使用close_time
-                    if "trading_day" in df.columns and "profit" in df.columns:
-                        df_today = df[df["trading_day"] == today]
-                        realized = df_today["profit"].sum()
-                    elif "close_time" in df.columns and "profit" in df.columns:
-                        # 兼容旧数据格式
-                        df_today = df[
-                            df["close_time"].astype(str).str.startswith(today)
-                        ]
-                        realized = df_today["profit"].sum()
+                    df = pd.read_excel(excel_path, sheet_name=account_id)
+                    # 过滤出今日的已实现盈亏
+                    df["date"] = pd.to_datetime(df["date"])
+                    today_df = df[df["date"].dt.strftime("%Y-%m-%d") == trading_day]
+                    realized_pnl = today_df["realized_pnl"].sum()
                 except Exception as e:
                     print(f"读取已实现盈亏数据出错: {str(e)}")
-                    pass
-
-            unrealized = 0
-            if trader and trader.is_connected():
-                positions = trader.get_all_positions()
-                if positions:
-                    unrealized = sum([p["profit"] for p in positions])
-
-            total = realized + unrealized
-            self.realized_label.setText(f"今日已实现盈亏: {realized:.2f}")
-            self.unrealized_label.setText(f"当前浮动盈亏: {unrealized:.2f}")
-            self.total_pnl_label.setText(f"日内总盈亏: {total:.2f}")
-
+                    # 如果找不到worksheet，则新建一个
+                    if "Worksheet named" in str(e) and "not found" in str(e):
+                        print("没有worksheet就新建一个")
+                        df = pd.DataFrame(columns=["date", "realized_pnl"])
+                        df.to_excel(excel_path, sheet_name=account_id, index=False)
+                        realized_pnl = 0
+            # 获取浮动盈亏
+            positions = trader.get_all_positions()
+            unrealized_pnl = (
+                sum(position["profit"] for position in positions) if positions else 0
+            )
+            # 计算总盈亏
+            total = realized_pnl + unrealized_pnl
+            # 更新显示
+            self.realized_label.setText(f"今日已实现盈亏: {realized_pnl:.2f}")
+            self.unrealized_label.setText(f"当前浮动盈亏: {unrealized_pnl:.2f}")
             # 风控高亮
             if total <= -DAILY_LOSS_LIMIT:
                 self.total_pnl_label.setStyleSheet(
@@ -83,7 +79,7 @@ class PnlInfoSection:
                 self.total_pnl_label.setStyleSheet(
                     "QLabel { color: black; font-weight: bold; }"
                 )
-
+                self.total_pnl_label.setText(f"日内总盈亏: {total:.2f}")
         except Exception as e:
             self.realized_label.setText("今日已实现盈亏: --")
             self.unrealized_label.setText("当前浮动盈亏: --")

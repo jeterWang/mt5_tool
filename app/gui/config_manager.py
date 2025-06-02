@@ -30,6 +30,12 @@ def save_gui_config(gui_window):
         GUI_SETTINGS["SOUND_ALERT"] = countdown.sound_checkbox.isChecked()
         GUI_SETTINGS["WINDOW_TOP"] = countdown.topmost_checkbox.isChecked()
 
+        # 保存一键保本偏移点数设置
+        if "BREAKEVEN_OFFSET_POINTS" in GUI_SETTINGS:
+            print(
+                f"当前一键保本偏移点数设置为: {GUI_SETTINGS['BREAKEVEN_OFFSET_POINTS']}"
+            )
+
         # 更新止损模式设置
         trading_settings = gui_window.components["trading_settings"]
         SL_MODE["DEFAULT_MODE"] = (

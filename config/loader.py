@@ -25,6 +25,7 @@ GUI_SETTINGS = {
     "ALERT_SECONDS": 30,  # 提前30秒提醒
     "BEEP_FREQUENCY": 750,  # 提示音频率
     "BEEP_DURATION": 800,  # 提示音持续时间
+    "BREAKEVEN_OFFSET_POINTS": 0,  # 一键保本偏移点数
 }
 
 # 止损模式
