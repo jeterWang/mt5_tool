@@ -16,14 +16,15 @@ MT5交易系统是一款基于MetaTrader 5的多功能量化交易管理工具�
 ## 项目结构
 ```
 mt5/
-├── app/                 # 应用核心代码
+├── app/                 # 应用核心代码（主程序、界面、交易逻辑等）
 │   ├── __init__.py      # 初始化文件
 │   ├── database.py      # 数据库操作类
-│   ├── trader.py        # MT5交易类
-│   └── gui.py           # GUI界面类
+│   ├── trader/          # 交易相关模块
+│   ├── gui/             # 图形界面相关模块
+│   └── ...
 ├── config/              # 配置文件目录
 │   ├── __init__.py      # 初始化文件
-│   ├── config.json      # 配置JSON文件
+│   ├── config.json      # 配置JSON文件（所有参数、批量下单等）
 │   └── loader.py        # 配置加载器
 ├── resources/           # 资源文件目录
 │   ├── fonts/           # 字体文件
@@ -37,6 +38,11 @@ mt5/
 ├── requirements.txt     # 依赖包列表
 └── README.md            # 项目说明文件
 ```
+
+> **使用说明：**
+>
+> - **推荐方式1：** 直接到 [Releases](https://github.com/yourrepo/mt5-trading-system/releases) 页面下载最新的 `.7z` 压缩包，解压后双击运行，无需源码和环境配置。
+> - **方式2：** 如需自定义开发或二次开发，可克隆源码并按下方开发环境设置操作。
 
 ## 开发环境设置
 1. **克隆仓库**
