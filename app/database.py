@@ -10,6 +10,7 @@ import os
 from utils.paths import get_data_path
 from config.loader import TRADING_DAY_RESET_HOUR
 import logging
+import pandas as pd
 
 
 class TradeDatabase:
@@ -194,3 +195,139 @@ class TradeDatabase:
         finally:
             if self.conn:
                 self.conn.close()
+
+    def set_today_count(self, count):
+        """直接设置今日交易次数（用于从xlsx自动统计后更新）"""
+        today = self.get_trading_day()
+        try:
+            self.conn = sqlite3.connect(self.db_path)
+            cursor = self.conn.cursor()
+
+            # 查询今日记录是否存在
+            cursor.execute("SELECT count FROM trade_count WHERE date = ?", (today,))
+            result = cursor.fetchone()
+
+            if result:
+                # 如果记录存在，更新计数
+                cursor.execute(
+                    "UPDATE trade_count SET count = ? WHERE date = ?",
+                    (count, today),
+                )
+            else:
+                # 如果记录不存在，创建新记录
+                cursor.execute(
+                    "INSERT INTO trade_count (date, count) VALUES (?, ?)",
+                    (today, count),
+                )
+
+            self.conn.commit()
+            print(f"已更新今日({today})交易次数为: {count}")
+            return True
+        except Exception as e:
+            logging.error(f"设置交易次数出错: {str(e)}")
+            return False
+        finally:
+            if self.conn:
+                self.conn.close()
+
+    def auto_update_trade_count_from_xlsx(self, trader=None):
+        """从trade_records.xlsx自动统计并更新交易次数"""
+        try:
+            data_dir = get_data_path()
+            file_path = os.path.join(data_dir, "trade_records.xlsx")
+
+            if not os.path.exists(file_path):
+                print("trade_records.xlsx文件不存在，跳过交易次数更新")
+                return False
+
+            # 获取账户ID
+            account_id = "unknown"
+            if trader and hasattr(trader, "_get_account_id"):
+                try:
+                    account_id = trader._get_account_id()
+                except:
+                    pass
+
+            # 读取Excel文件
+            try:
+                df = pd.read_excel(file_path, sheet_name=str(account_id))
+            except Exception as e:
+                print(f"读取账户{account_id}的sheet失败: {e}")
+                return False
+
+            if df.empty or "open_time" not in df.columns:
+                print("xlsx文件为空或缺少open_time字段")
+                return False
+
+            # 获取交易日
+            today = self.get_trading_day()
+            print(f"统计交易日 {today} 的交易次数")
+
+            # 过滤今日交易记录
+            today_trades = self.filter_today_trades(df, today)
+
+            if today_trades.empty:
+                print(f"今日({today})无交易记录")
+                self.set_today_count(0)
+                return True
+
+            # 合并1分钟内的交易为一笔
+            merged_count = self.merge_trades_within_1min(today_trades)
+
+            # 更新数据库
+            self.set_today_count(merged_count)
+            print(
+                f"今日共有 {len(today_trades)} 笔原始交易，合并后为 {merged_count} 笔"
+            )
+
+            return True
+
+        except Exception as e:
+            logging.error(f"自动更新交易次数出错: {str(e)}")
+            print(f"自动更新交易次数出错: {str(e)}")
+            return False
+
+    def filter_today_trades(self, df, today):
+        """根据交易日重置时间过滤今日交易"""
+        try:
+            # 确保open_time是datetime类型
+            df["open_time"] = pd.to_datetime(df["open_time"])
+
+            # 获取今日开始时间（考虑重置时间）
+            today_date = datetime.strptime(today, "%Y-%m-%d")
+            today_start = today_date.replace(
+                hour=TRADING_DAY_RESET_HOUR, minute=0, second=0, microsecond=0
+            )
+
+            # 获取明日开始时间
+            tomorrow_start = today_start + timedelta(days=1)
+
+            # 过滤时间范围内的交易
+            today_trades = df[
+                (df["open_time"] >= today_start) & (df["open_time"] < tomorrow_start)
+            ].copy()
+
+            return today_trades.sort_values("open_time")
+
+        except Exception as e:
+            print(f"过滤今日交易出错: {e}")
+            return pd.DataFrame()
+
+    def merge_trades_within_1min(self, trades_df):
+        """将1分钟内的交易合并为一笔交易"""
+        if trades_df.empty:
+            return 0
+
+        merged_count = 0
+        last_time = None
+
+        for _, trade in trades_df.iterrows():
+            current_time = trade["open_time"]
+
+            if last_time is None or (current_time - last_time).total_seconds() > 60:
+                # 超过1分钟，算作新的一笔交易
+                merged_count += 1
+                last_time = current_time
+            # 否则，1分钟内的交易不计新的一笔
+
+        return merged_count

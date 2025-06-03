@@ -75,28 +75,10 @@ def check_trade_limit(db, gui_window):
             winsound.Beep(1000, 1000)  # 频率1000，持续1秒
             return False
 
-        # 更新界面显示
-        account_info = gui_window.components["account_info"]
-        account_info.update_trade_count_display(db)
-
         return True
     except Exception as e:
         print(f"检查交易次数限制出错: {str(e)}")
         return True  # 出错时允许继续交易，避免错误阻止用户交易
-
-
-def increment_trade_count(db, gui_window):
-    """
-    增加交易次数计数
-
-    Args:
-        db: TradeDatabase实例
-        gui_window: 主窗口实例
-    """
-    if db.increment_count():
-        # 更新主界面上的交易次数显示
-        account_info = gui_window.components["account_info"]
-        account_info.update_trade_count_display(db)
 
 
 def check_daily_loss_limit(trader, db, gui_window):

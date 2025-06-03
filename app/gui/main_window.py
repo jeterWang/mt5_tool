@@ -237,6 +237,11 @@ class MT5GUI(QMainWindow):
         self.pnl_timer.timeout.connect(self.update_daily_pnl_info)
         self.pnl_timer.start(2000)  # 每2秒刷新一次
 
+        # 自动交易次数统计定时器（从xlsx文件读取并合并）
+        self.trade_count_timer = QTimer()
+        self.trade_count_timer.timeout.connect(self.auto_update_trade_count)
+        self.trade_count_timer.start(30000)  # 每30秒更新一次交易次数
+
     def on_sl_mode_changed(self, index):
         """
         处理止损模式变更
@@ -511,3 +516,14 @@ class MT5GUI(QMainWindow):
             "支持批量下单、突破交易和风控管理\n\n"
             "© 2023 All Rights Reserved",
         )
+
+    def auto_update_trade_count(self):
+        """自动从xlsx文件更新交易次数"""
+        try:
+            # 调用数据库的自动更新方法
+            if self.db.auto_update_trade_count_from_xlsx(self.trader):
+                # 更新成功后刷新界面显示
+                account_info = self.components["account_info"]
+                account_info.update_trade_count_display(self.db)
+        except Exception as e:
+            print(f"自动更新交易次数出错: {str(e)}")

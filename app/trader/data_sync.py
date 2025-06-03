@@ -14,34 +14,6 @@ from utils.paths import get_data_path
 from config.loader import Delta_TIMEZONE, TRADING_DAY_RESET_HOUR
 
 
-def _record_trade_to_excel(account_id, trade_info):
-    """
-    记录交易到excel，按账号分sheet
-
-    Args:
-        account_id: 账号ID
-        trade_info: 交易信息dict
-    """
-    data_dir = get_data_path()
-    file_path = os.path.join(data_dir, "trade_records.xlsx")
-    sheet_name = str(account_id)
-    df_new = pd.DataFrame([trade_info])
-
-    if os.path.exists(file_path):
-        with pd.ExcelWriter(
-            file_path, engine="openpyxl", mode="a", if_sheet_exists="overlay"
-        ) as writer:
-            try:
-                df_old = pd.read_excel(file_path, sheet_name=sheet_name)
-                df_all = pd.concat([df_old, df_new], ignore_index=True)
-            except Exception:
-                df_all = df_new
-            df_all.to_excel(writer, sheet_name=sheet_name, index=False)
-    else:
-        with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
-            df_new.to_excel(writer, sheet_name=sheet_name, index=False)
-
-
 def get_trading_day_from_datetime(dt):
     """
     从指定时间获取交易日

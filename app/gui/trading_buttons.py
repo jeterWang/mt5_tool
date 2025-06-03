@@ -9,7 +9,7 @@ import MetaTrader5 as mt5
 import winsound
 
 from config.loader import GUI_SETTINGS, BATCH_ORDER_DEFAULTS, SL_MODE, BREAKOUT_SETTINGS
-from app.gui.risk_control import check_trade_limit, increment_trade_count
+from app.gui.risk_control import check_trade_limit
 
 
 class TradingButtonsSection:
@@ -352,17 +352,22 @@ class TradingButtonsSection:
 
             if orders:
                 # 更新默认K线回溯数量
-                if sl_mode == "CANDLE_KEY_LEVEL":
-                    SL_MODE["CANDLE_LOOKBACK"] = batch_order.sl_candle_inputs[0].value()
+                if sl_mode == "CANDLE_KEY_LEVEL" and batch_order.orders:
+                    SL_MODE["CANDLE_LOOKBACK"] = batch_order.orders[0]["sl_candle"]
                     # 保存配置
                     trading_settings.on_sl_mode_changed(
                         trading_settings.sl_mode_combo.currentIndex()
                     )
 
-                # 增加交易次数计数
-                increment_trade_count(self.gui_window.db, self.gui_window)
+                # 更新界面
+                self.gui_window.components["account_info"].update_pnl_display(
+                    self.trader, self.gui_window.db
+                )
+                self.gui_window.components["account_info"].update_account_info(
+                    self.trader
+                )
                 self.gui_window.status_bar.showMessage(
-                    f"批量{order_type}单成功！订单号：{', '.join(map(str, orders))}"
+                    f"批量{order_type}订单已成功下单"
                 )
                 # 播放提示音
                 winsound.Beep(
@@ -494,26 +499,21 @@ class TradingButtonsSection:
 
             if orders:
                 # 更新默认K线回溯数量
-                if sl_mode == "CANDLE_KEY_LEVEL":
-                    SL_MODE["CANDLE_LOOKBACK"] = batch_order.sl_candle_inputs[0].value()
+                if sl_mode == "CANDLE_KEY_LEVEL" and batch_order.orders:
+                    SL_MODE["CANDLE_LOOKBACK"] = batch_order.orders[0]["sl_candle"]
                     # 保存配置
                     trading_settings.on_sl_mode_changed(
                         trading_settings.sl_mode_combo.currentIndex()
                     )
 
-                # 增加交易次数计数
-                increment_trade_count(self.gui_window.db, self.gui_window)
-
-                # 显示更详细的成功信息，包括每个订单的止损价格
-                success_message = (
-                    f"{comment_prefix}成功！订单号：{', '.join(map(str, orders))}"
+                # 更新界面
+                self.gui_window.components["account_info"].update_pnl_display(
+                    self.trader, self.gui_window.db
                 )
-                if sl_mode == "CANDLE_KEY_LEVEL":
-                    # 添加各订单的止损详情
-                    details_str = " | ".join(order_details)
-                    success_message += f"\n止损详情: {details_str}"
-
-                self.gui_window.status_bar.showMessage(success_message)
+                self.gui_window.components["account_info"].update_account_info(
+                    self.trader
+                )
+                self.gui_window.status_bar.showMessage(f"突破订单已成功下单")
 
                 # 播放提示音
                 winsound.Beep(

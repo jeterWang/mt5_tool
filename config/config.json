@@ -5,7 +5,7 @@
         "NAS100"
     ],
     "DEFAULT_TIMEFRAME": "M1",
-    "Delta_TIMEZONE": -3,
+    "Delta_TIMEZONE": 0,
     "TRADING_DAY_RESET_HOUR": 20,
     "DAILY_LOSS_LIMIT": 150.0,
     "DAILY_TRADE_LIMIT": 10,
