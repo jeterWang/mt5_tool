@@ -49,30 +49,19 @@ def save_gui_config(gui_window):
 
         # 更新批量下单默认值
         batch_order = gui_window.components["batch_order"]
-        for i in range(4):
+        for i, order in enumerate(batch_order.orders):
             order_key = f"order{i+1}"
-            # 保存当前批量订单值
-            current_volume = batch_order.volume_inputs[i].value()
-            current_sl_points = batch_order.sl_points_inputs[i].value()
-            current_tp_points = batch_order.tp_points_inputs[i].value()
-            current_sl_candle = batch_order.sl_candle_inputs[i].value()
-
-            # 调试信息
-            print(
-                f"保存批量订单{i+1}设置: 手数={current_volume}, 止损点数={current_sl_points}, 止盈点数={current_tp_points}, K线回溯={current_sl_candle}"
-            )
-
-            # 创建新的订单设置字典，确保包含所有必要字段
             BATCH_ORDER_DEFAULTS[order_key] = {
-                "volume": current_volume,
-                "sl_points": current_sl_points,
-                "tp_points": current_tp_points,
-                "sl_candle": current_sl_candle,
+                "volume": order["volume"],
+                "sl_points": order["sl_points"],
+                "tp_points": order["tp_points"],
+                "sl_candle": order["sl_candle"],
+                "checked": order["checked"],
             }
 
         # 更新K线关键位止损默认K线回溯数量
-        if SL_MODE["DEFAULT_MODE"] == "CANDLE_KEY_LEVEL":
-            SL_MODE["CANDLE_LOOKBACK"] = batch_order.sl_candle_inputs[0].value()
+        if SL_MODE["DEFAULT_MODE"] == "CANDLE_KEY_LEVEL" and batch_order.orders:
+            SL_MODE["CANDLE_LOOKBACK"] = batch_order.orders[0]["sl_candle"]
             print(f"设置K线回溯数量: {SL_MODE['CANDLE_LOOKBACK']}")
 
         # 打印保存后的批量下单设置

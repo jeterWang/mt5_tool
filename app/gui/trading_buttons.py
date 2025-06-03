@@ -307,32 +307,24 @@ class TradingButtonsSection:
                 point = symbol_info.point
                 sl_offset = BREAKOUT_SETTINGS["SL_OFFSET_POINTS"] * point
 
-            # 下四个订单
+            # 下所有勾选的订单
             orders = []
-            for i in range(4):
-                # 检查手数是否为0，跳过
-                if batch_order.volume_inputs[i].value() <= 0:
+            for i, order in enumerate(batch_order.orders):
+                if not order["checked"] or order["volume"] <= 0:
                     continue
-
-                # 根据止损模式设置止损
                 if sl_mode == "FIXED_POINTS":
-                    # 使用固定点数止损
-                    order = self.trader.place_order_with_tp_sl(
+                    mt5_order = self.trader.place_order_with_tp_sl(
                         symbol=symbol,
                         order_type=order_type,
-                        volume=batch_order.volume_inputs[i].value(),
-                        sl_points=batch_order.sl_points_inputs[i].value(),
-                        tp_points=batch_order.tp_points_inputs[i].value(),
+                        volume=order["volume"],
+                        sl_points=order["sl_points"],
+                        tp_points=order["tp_points"],
                         comment=f"批量下单{i+1}",
                     )
                 else:
-                    # 使用K线关键位止损
-                    # 获取K线数据
                     countdown = self.gui_window.components["countdown"]
                     timeframe = countdown.timeframe_combo.currentText()
-                    # 使用sl_candle_inputs中的值作为K线回溯数量
-                    lookback = batch_order.sl_candle_inputs[i].value()
-
+                    lookback = order["sl_candle"]
                     rates = mt5.copy_rates_from_pos(
                         symbol, self.get_timeframe(timeframe), 0, lookback + 2
                     )
@@ -341,27 +333,22 @@ class TradingButtonsSection:
                             f"获取K线数据失败，需要至少{lookback + 2}根K线！"
                         )
                         return
-
-                    # 计算最低点和最高点（跳过当前K线和前一根K线）
                     lowest_point = min([rate["low"] for rate in rates[2:]])
                     highest_point = max([rate["high"] for rate in rates[2:]])
-
                     if order_type == "buy":
                         sl_price = lowest_point - sl_offset
                     else:
                         sl_price = highest_point + sl_offset
-
-                    order = self.trader.place_order_with_key_level_sl(
+                    mt5_order = self.trader.place_order_with_key_level_sl(
                         symbol=symbol,
                         order_type=order_type,
-                        volume=batch_order.volume_inputs[i].value(),
+                        volume=order["volume"],
                         sl_price=sl_price,
-                        tp_points=batch_order.tp_points_inputs[i].value(),
+                        tp_points=order["tp_points"],
                         comment=f"批量下单{i+1}",
                     )
-
-                if order:
-                    orders.append(order)
+                if mt5_order:
+                    orders.append(mt5_order)
 
             if orders:
                 # 更新默认K线回溯数量
@@ -460,38 +447,22 @@ class TradingButtonsSection:
                 order_type = "sell_stop"  # 使用sell_stop而不是sell
                 comment_prefix = f"{timeframe}低点突破卖出"
 
-            # 下四个订单
+            # 下所有勾选的订单
             orders = []
-            order_details = []  # 用于记录和显示订单详情
-
-            for i in range(4):
-                # 检查手数是否为0，跳过
-                if batch_order.volume_inputs[i].value() <= 0:
+            order_details = []
+            for i, order in enumerate(batch_order.orders):
+                if not order["checked"] or order["volume"] <= 0:
                     continue
-
-                # 根据止损模式设置止损
                 sl_price = None
-
                 if sl_mode == "FIXED_POINTS":
-                    # 使用固定点数止损 - 使用原先的逻辑
                     if breakout_type == "high":
-                        sl_price = (
-                            entry_price
-                            - batch_order.sl_points_inputs[i].value() * point
-                        )
+                        sl_price = entry_price - order["sl_points"] * point
                     else:
-                        sl_price = (
-                            entry_price
-                            + batch_order.sl_points_inputs[i].value() * point
-                        )
+                        sl_price = entry_price + order["sl_points"] * point
                 else:
-                    # 使用K线关键位止损
-                    # 获取K线数据
                     countdown = self.gui_window.components["countdown"]
                     timeframe = countdown.timeframe_combo.currentText()
-                    # 使用sl_candle_inputs中的值作为K线回溯数量
-                    lookback = batch_order.sl_candle_inputs[i].value()
-
+                    lookback = order["sl_candle"]
                     rates = mt5.copy_rates_from_pos(
                         symbol, self.get_timeframe(timeframe), 0, lookback + 2
                     )
@@ -500,32 +471,25 @@ class TradingButtonsSection:
                             f"获取K线数据失败，需要至少{lookback + 2}根K线！"
                         )
                         return
-
-                    # 计算最低点和最高点（跳过当前K线和前一根K线）
                     lowest_point = min([rate["low"] for rate in rates[2:]])
                     highest_point = max([rate["high"] for rate in rates[2:]])
-
                     if breakout_type == "high":
                         sl_price = lowest_point - sl_offset * point
                     else:
                         sl_price = highest_point + sl_offset * point
-
-                # 下单
-                order = self.trader.place_pending_order(
+                mt5_order = self.trader.place_pending_order(
                     symbol=symbol,
                     order_type=order_type,
-                    volume=batch_order.volume_inputs[i].value(),
+                    volume=order["volume"],
                     price=entry_price,
                     sl_price=sl_price,
-                    tp_points=batch_order.tp_points_inputs[i].value(),  # 止盈仍使用点数
+                    tp_points=order["tp_points"],
                     comment=f"{comment_prefix}{i+1}",
                 )
-
-                if order:
-                    orders.append(order)
-                    # 记录订单详情
+                if mt5_order:
+                    orders.append(mt5_order)
                     order_details.append(
-                        f"订单{i+1}: K线数={batch_order.sl_candle_inputs[i].value()}, 止损价={sl_price:.5f}"
+                        f"订单{i+1}: K线数={order['sl_candle']}, 止损价={sl_price:.5f}"
                     )
 
             if orders:

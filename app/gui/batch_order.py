@@ -11,8 +11,13 @@ from PyQt6.QtWidgets import (
     QLabel,
     QDoubleSpinBox,
     QSpinBox,
+    QCheckBox,
+    QPushButton,
+    QWidget,
 )
+from PyQt6.QtCore import Qt
 from config.loader import BATCH_ORDER_DEFAULTS, SL_MODE, save_config
+from PyQt6.QtGui import QIcon
 
 
 # 全局变量，用于存储当前实例
@@ -21,6 +26,8 @@ _instance = None
 
 class BatchOrderSection:
     """批量下单设置区域"""
+
+    MAX_ORDERS = 10
 
     def __init__(self):
         """初始化批量下单设置区域"""
@@ -31,126 +38,217 @@ class BatchOrderSection:
         self.layout = QVBoxLayout()
         self.group_box.setLayout(self.layout)
 
-        # 批量下单设置控件
-        self.volume_inputs = []
-        self.sl_points_inputs = []  # 固定点数止损
-        self.sl_candle_inputs = []  # K线回溯数量
-        self.tp_points_inputs = []
-        self.sl_labels = []  # 存储止损标签的引用，以便动态修改
+        # 订单数据结构
+        self.orders = (
+            []
+        )  # 每个元素是dict: {volume, sl_points, tp_points, sl_candle, checked}
+        self.order_rows = []  # 每行控件的引用，便于删除
 
-        self.init_ui()
+        # 添加新单按钮
+        self.add_btn = QPushButton()
+        self.add_btn.setIcon(QIcon.fromTheme("list-add"))  # 使用系统加号图标
+        self.add_btn.setText("")
+        self.add_btn.setFixedSize(32, 32)
+        self.add_btn.setStyleSheet(
+            "QPushButton { background-color: #27ae60; color: white; border-radius: 16px; font-size: 20px; } QPushButton:hover { background-color: #2ecc71; }"
+        )
+        self.add_btn.clicked.connect(self.add_order)
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch(1)
+        btn_layout.addWidget(self.add_btn)
+        self.layout.addLayout(btn_layout)
 
-    def init_ui(self):
-        """初始化UI"""
-        # 创建4个批量订单输入行
-        for i in range(1, 5):
-            order_layout = QHBoxLayout()
-            order_layout.addWidget(QLabel(f"第{i}单:"))
+        # 初始化订单（从BATCH_ORDER_DEFAULTS加载所有已保存的单子，最多10单）
+        for i in range(1, self.MAX_ORDERS + 1):
+            key = f"order{i}"
+            if key in BATCH_ORDER_DEFAULTS:
+                order = {
+                    "volume": BATCH_ORDER_DEFAULTS[key].get("volume", 0.01),
+                    "sl_points": BATCH_ORDER_DEFAULTS[key].get("sl_points", 0),
+                    "tp_points": BATCH_ORDER_DEFAULTS[key].get("tp_points", 0),
+                    "sl_candle": BATCH_ORDER_DEFAULTS[key].get(
+                        "sl_candle", SL_MODE["CANDLE_LOOKBACK"]
+                    ),
+                    "checked": BATCH_ORDER_DEFAULTS[key].get("checked", True),
+                }
+                self.orders.append(order)
+        # 如果没有任何订单，至少加一个默认单
+        if not self.orders:
+            self.orders.append(
+                {
+                    "volume": 0.01,
+                    "sl_points": 0,
+                    "tp_points": 0,
+                    "sl_candle": SL_MODE["CANDLE_LOOKBACK"],
+                    "checked": True,
+                }
+            )
+        self.refresh_orders_ui()
+        self.update_sl_mode(SL_MODE["DEFAULT_MODE"])
 
-            # 手数输入
+    def refresh_orders_ui(self):
+        # 清除原有行
+        for row in self.order_rows:
+            row["widget"].setParent(None)
+        self.order_rows.clear()
+
+        # 逐行添加
+        for idx, order in enumerate(self.orders):
+            row_widget = QWidget()
+            row_layout = QHBoxLayout(row_widget)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+
+            # 勾选框
+            check = QCheckBox()
+            check.setChecked(order["checked"])
+            check.stateChanged.connect(
+                lambda state, i=idx: self.on_checked_changed(i, state)
+            )
+            row_layout.addWidget(check)
+
+            # 标签
+            row_layout.addWidget(QLabel(f"第{idx+1}单:"))
+
+            # 手数
             volume_input = QDoubleSpinBox()
             volume_input.setRange(0.01, 100)
             volume_input.setSingleStep(0.01)
-            volume_input.setValue(BATCH_ORDER_DEFAULTS[f"order{i}"]["volume"])
-            # 连接信号以自动保存设置
-            volume_input.valueChanged.connect(self.save_batch_settings)
-            self.volume_inputs.append(volume_input)
+            volume_input.setValue(order["volume"])
+            volume_input.valueChanged.connect(
+                lambda val, i=idx: self.on_value_changed(i, "volume", val)
+            )
+            row_layout.addWidget(QLabel("手数:"))
+            row_layout.addWidget(volume_input)
 
-            # 止损点数/K线个数
+            # 止损点数/K线回溯
             sl_label = QLabel("止损点数:")
-            self.sl_labels.append(sl_label)  # 保存标签引用以便后续修改
-
+            row_layout.addWidget(sl_label)
             sl_points_input = QSpinBox()
             sl_points_input.setRange(0, 100000)
-            sl_points_input.setValue(BATCH_ORDER_DEFAULTS[f"order{i}"]["sl_points"])
-            # 连接信号以自动保存设置
-            sl_points_input.valueChanged.connect(self.save_batch_settings)
-            self.sl_points_inputs.append(sl_points_input)
+            sl_points_input.setValue(order["sl_points"])
+            sl_points_input.valueChanged.connect(
+                lambda val, i=idx: self.on_value_changed(i, "sl_points", val)
+            )
+            row_layout.addWidget(sl_points_input)
 
-            # K线回溯数量输入（初始隐藏）
             sl_candle_input = QSpinBox()
             sl_candle_input.setRange(1, 20)
-            # 使用get方法获取sl_candle字段，如果不存在则使用CANDLE_LOOKBACK作为默认值
-            sl_candle_input.setValue(
-                BATCH_ORDER_DEFAULTS[f"order{i}"].get(
-                    "sl_candle", SL_MODE["CANDLE_LOOKBACK"]
-                )
+            sl_candle_input.setValue(order["sl_candle"])
+            sl_candle_input.valueChanged.connect(
+                lambda val, i=idx: self.on_value_changed(i, "sl_candle", val)
             )
-            # 连接信号以自动保存设置
-            sl_candle_input.valueChanged.connect(self.save_batch_settings)
-            sl_candle_input.setVisible(False)  # 初始隐藏
-            self.sl_candle_inputs.append(sl_candle_input)
+            sl_candle_input.setVisible(False)
+            row_layout.addWidget(sl_candle_input)
 
-            # 止盈点数输入
+            # 止盈点数
+            row_layout.addWidget(QLabel("止盈点数:"))
             tp_points_input = QSpinBox()
             tp_points_input.setRange(0, 100000)
-            tp_points_input.setValue(BATCH_ORDER_DEFAULTS[f"order{i}"]["tp_points"])
-            # 连接信号以自动保存设置
-            tp_points_input.valueChanged.connect(self.save_batch_settings)
-            self.tp_points_inputs.append(tp_points_input)
+            tp_points_input.setValue(order["tp_points"])
+            tp_points_input.valueChanged.connect(
+                lambda val, i=idx: self.on_value_changed(i, "tp_points", val)
+            )
+            row_layout.addWidget(tp_points_input)
 
-            order_layout.addWidget(QLabel("手数:"))
-            order_layout.addWidget(volume_input)
-            order_layout.addWidget(sl_label)
-            order_layout.addWidget(sl_points_input)
-            order_layout.addWidget(sl_candle_input)  # 添加控件但初始隐藏
-            order_layout.addWidget(QLabel("止盈点数:"))
-            order_layout.addWidget(tp_points_input)
+            # 删除按钮
+            del_btn = QPushButton("删除")
+            del_btn.setStyleSheet(
+                "QPushButton { background-color: #e74c3c; color: white; font-weight: bold; border: none; } QPushButton:hover { background-color: #c0392b; color: white; border: none; }"
+            )
+            del_btn.clicked.connect(lambda _, i=idx: self.delete_order(i))
+            row_layout.addWidget(del_btn)
 
-            self.layout.addLayout(order_layout)
+            self.layout.addWidget(row_widget)
+            self.order_rows.append(
+                {
+                    "widget": row_widget,
+                    "check": check,
+                    "volume": volume_input,
+                    "sl_label": sl_label,
+                    "sl_points": sl_points_input,
+                    "sl_candle": sl_candle_input,
+                    "tp_points": tp_points_input,
+                    "del_btn": del_btn,
+                }
+            )
 
-        # 检查当前的止损模式并更新UI
-        self.update_sl_mode(SL_MODE["DEFAULT_MODE"])
+    def add_order(self):
+        if len(self.orders) >= self.MAX_ORDERS:
+            return
+        self.orders.append(
+            {
+                "volume": 0.01,
+                "sl_points": 0,
+                "tp_points": 0,
+                "sl_candle": SL_MODE["CANDLE_LOOKBACK"],
+                "checked": True,
+            }
+        )
+        self.refresh_orders_ui()
+        self.save_batch_settings()
+
+    def delete_order(self, idx):
+        if len(self.orders) <= 1:
+            return
+        self.orders.pop(idx)
+        self.refresh_orders_ui()
+        self.save_batch_settings()
+
+    def on_checked_changed(self, idx, state):
+        self.orders[idx]["checked"] = state == Qt.CheckState.Checked.value
+        self.save_batch_settings()
+
+    def on_value_changed(self, idx, key, value):
+        self.orders[idx][key] = value
+        self.save_batch_settings()
 
     def save_batch_settings(self):
         """实时保存批量订单设置"""
         try:
             print("正在保存批量订单设置...")
-            # 更新批量下单默认值
-            for i in range(4):
-                order_key = f"order{i+1}"
-                # 保存当前批量订单值
+            # 只保存volume>0的订单
+            valid_count = 0
+            for i, order in enumerate(self.orders[: self.MAX_ORDERS]):
+                if order["volume"] <= 0:
+                    continue  # 跳过空单
+                order_key = f"order{valid_count+1}"
                 BATCH_ORDER_DEFAULTS[order_key] = {
-                    "volume": self.volume_inputs[i].value(),
-                    "sl_points": self.sl_points_inputs[i].value(),
-                    "tp_points": self.tp_points_inputs[i].value(),
-                    "sl_candle": self.sl_candle_inputs[i].value(),
+                    "volume": order["volume"],
+                    "sl_points": order["sl_points"],
+                    "tp_points": order["tp_points"],
+                    "sl_candle": order["sl_candle"],
+                    "checked": order["checked"],
                 }
-                # 打印调试信息
                 print(
-                    f"批量订单{i+1}设置: 手数={self.volume_inputs[i].value()}, "
-                    f"止损点数={self.sl_points_inputs[i].value()}, "
-                    f"止盈点数={self.tp_points_inputs[i].value()}, "
-                    f"K线回溯={self.sl_candle_inputs[i].value()}"
+                    f"批量订单{valid_count+1}设置: 手数={order['volume']}, "
+                    f"止损点数={order['sl_points']}, "
+                    f"止盈点数={order['tp_points']}, "
+                    f"K线回溯={order['sl_candle']}"
                 )
+                valid_count += 1
+            # 清理多余的orderN
+            for i in range(valid_count + 1, self.MAX_ORDERS + 1):
+                BATCH_ORDER_DEFAULTS.pop(f"order{i}", None)
 
             # 保存配置到文件
             result = save_config()
             if result:
                 print("批量订单设置已成功保存")
-
-                # 重新加载配置以确保内存和UI一致
                 from config.loader import (
                     load_config,
                     BATCH_ORDER_DEFAULTS as updated_defaults,
                 )
 
                 load_config()
-
-                # 验证配置是否真正保存并加载
-                for i in range(4):
+                for i in range(valid_count):
                     order_key = f"order{i+1}"
-                    expected_volume = self.volume_inputs[i].value()
+                    expected_volume = self.orders[i]["volume"]
                     actual_volume = updated_defaults[order_key].get("volume")
-
-                    if (
-                        abs(expected_volume - actual_volume) > 0.001
-                    ):  # 使用误差范围比较浮点数
+                    if abs(expected_volume - actual_volume) > 0.001:
                         print(
                             f"警告: {order_key}手数值不一致, UI:{expected_volume}, 内存:{actual_volume}"
                         )
-                        # 将UI值强制设置为内存中的值以确保一致性
-                        self.volume_inputs[i].setValue(actual_volume)
+                        self.orders[i]["volume"] = actual_volume
                     else:
                         print(f"{order_key}手数保存成功: {actual_volume}")
             else:
@@ -167,44 +265,16 @@ class BatchOrderSection:
         Args:
             mode: 止损模式，'FIXED_POINTS'或'CANDLE_KEY_LEVEL'
         """
-        # 根据止损模式更新标签和输入范围
-        if mode == "FIXED_POINTS":  # 固定点数止损
-            # 更新标签文本
-            for label in self.sl_labels:
-                label.setText("止损点数:")
-
-            # 切换显示固定点数控件，隐藏K线回溯控件
-            for i in range(len(self.sl_points_inputs)):
-                self.sl_points_inputs[i].setVisible(True)
-                self.sl_candle_inputs[i].setVisible(False)
-
-            # 更新输入范围（针对点数）
-            for sl_input in self.sl_points_inputs:
-                sl_input.setRange(0, 100000)
-                sl_input.setSingleStep(100)  # 以100点为步进
-                # 使用默认值
-                sl_input.setValue(BATCH_ORDER_DEFAULTS["order1"]["sl_points"])
-        else:  # K线关键位止损
-            # 更新标签文本
-            for label in self.sl_labels:
-                label.setText("K线回溯:")
-
-            # 切换显示K线回溯控件，隐藏固定点数控件
-            for i in range(len(self.sl_points_inputs)):
-                self.sl_points_inputs[i].setVisible(False)
-                self.sl_candle_inputs[i].setVisible(True)
-
-            # 更新K线回溯输入范围
-            for i, sl_input in enumerate(self.sl_candle_inputs):
-                sl_input.setRange(1, 20)  # 最少1根K线，最多20根
-                sl_input.setSingleStep(1)  # 以1为步进
-                # 使用配置中的默认值
-                order_key = f"order{i+1}"
-                sl_input.setValue(
-                    BATCH_ORDER_DEFAULTS[order_key].get(
-                        "sl_candle", SL_MODE["CANDLE_LOOKBACK"]
-                    )
-                )
+        # 根据止损模式切换显示
+        for row in self.order_rows:
+            if mode == "FIXED_POINTS":
+                row["sl_label"].setText("止损点数:")
+                row["sl_points"].setVisible(True)
+                row["sl_candle"].setVisible(False)
+            else:
+                row["sl_label"].setText("K线回溯:")
+                row["sl_points"].setVisible(False)
+                row["sl_candle"].setVisible(True)
 
     def update_symbol_params(self, symbol_params):
         """
@@ -213,54 +283,18 @@ class BatchOrderSection:
         Args:
             symbol_params: 交易品种参数字典
         """
-        # 设置手数范围
-        for volume_input in self.volume_inputs:
-            volume_input.setRange(
+        # 更新每行输入控件的范围
+        for row in self.order_rows:
+            row["volume"].setRange(
                 symbol_params["min_volume"], symbol_params["max_volume"]
             )
-            volume_input.setSingleStep(symbol_params["volume_step"])
-
-        # 根据止损模式设置止损范围
-        sl_mode = SL_MODE["DEFAULT_MODE"]
-
-        if sl_mode == "FIXED_POINTS":
-            # 使用点数止损
-            for sl_input in self.sl_points_inputs:
-                sl_input.setRange(
-                    symbol_params["min_sl_points"], symbol_params["max_sl_points"]
-                )
-        else:
-            # 使用K线止损，范围已在update_sl_mode中设置
-            pass
-
-        # 设置止盈范围
-        for tp_input in self.tp_points_inputs:
-            tp_input.setRange(
+            row["volume"].setSingleStep(symbol_params["volume_step"])
+            row["sl_points"].setRange(
+                symbol_params["min_sl_points"], symbol_params["max_sl_points"]
+            )
+            row["tp_points"].setRange(
                 symbol_params["min_tp_points"], symbol_params["max_tp_points"]
             )
-
-        # 设置默认值 (使用BATCH_ORDER_DEFAULTS)
-        for i in range(4):
-            order_key = f"order{i+1}"
-            if order_key in BATCH_ORDER_DEFAULTS:
-                self.volume_inputs[i].setValue(
-                    BATCH_ORDER_DEFAULTS[order_key]["volume"]
-                )
-                if sl_mode == "FIXED_POINTS":
-                    self.sl_points_inputs[i].setValue(
-                        BATCH_ORDER_DEFAULTS[order_key]["sl_points"]
-                    )
-                else:
-                    # K线止损模式
-                    self.sl_candle_inputs[i].setValue(
-                        BATCH_ORDER_DEFAULTS[order_key].get(
-                            "sl_candle", SL_MODE["CANDLE_LOOKBACK"]
-                        )
-                    )
-
-                self.tp_points_inputs[i].setValue(
-                    BATCH_ORDER_DEFAULTS[order_key]["tp_points"]
-                )
 
 
 # 模块级函数，供其他模块调用

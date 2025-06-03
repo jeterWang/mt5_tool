@@ -1,7 +1,7 @@
 {
     "SYMBOLS": [
         "USTECm",
-        "XAUUSD",
+        "XAUUSDm",
         "NAS100"
     ],
     "DEFAULT_TIMEFRAME": "M1",
@@ -31,25 +31,29 @@
             "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
-            "sl_candle": 3
+            "sl_candle": 3,
+            "checked": true
         },
         "order2": {
             "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
-            "sl_candle": 3
+            "sl_candle": 3,
+            "checked": true
         },
         "order3": {
             "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
-            "sl_candle": 3
+            "sl_candle": 3,
+            "checked": true
         },
         "order4": {
             "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
-            "sl_candle": 3
+            "sl_candle": 3,
+            "checked": false
         }
     }
 }
