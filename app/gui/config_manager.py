@@ -56,6 +56,7 @@ def save_gui_config(gui_window):
                 "sl_points": order["sl_points"],
                 "tp_points": order["tp_points"],
                 "sl_candle": order["sl_candle"],
+                "fixed_loss": order["fixed_loss"],
                 "checked": order["checked"],
             }
 

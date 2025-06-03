@@ -32,32 +32,32 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "checked": true,
-            "fixed_loss": 15.0
+            "fixed_loss": 50.0,
+            "checked": true
         },
         "order2": {
             "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "checked": true,
-            "fixed_loss": 15.0
+            "fixed_loss": 15.0,
+            "checked": true
         },
         "order3": {
             "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "checked": true,
-            "fixed_loss": 15.0
+            "fixed_loss": 15.0,
+            "checked": true
         },
         "order4": {
             "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "checked": false,
-            "fixed_loss": 15.0
+            "fixed_loss": 15.0,
+            "checked": false
         }
     },
     "POSITION_SIZING": {

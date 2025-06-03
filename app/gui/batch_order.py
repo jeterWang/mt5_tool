@@ -407,6 +407,8 @@ class BatchOrderSection:
                 load_config()
                 for i in range(valid_count):
                     order_key = f"order{i+1}"
+
+                    # 验证所有字段是否正确保存
                     expected_volume = self.orders[i]["volume"]
                     actual_volume = updated_defaults[order_key].get("volume")
                     if abs(expected_volume - actual_volume) > 0.001:
@@ -416,6 +418,31 @@ class BatchOrderSection:
                         self.orders[i]["volume"] = actual_volume
                     else:
                         print(f"{order_key}手数保存成功: {actual_volume}")
+
+                    # 验证fixed_loss字段
+                    expected_fixed_loss = self.orders[i]["fixed_loss"]
+                    actual_fixed_loss = updated_defaults[order_key].get("fixed_loss")
+                    if abs(expected_fixed_loss - actual_fixed_loss) > 0.001:
+                        print(
+                            f"警告: {order_key}固定亏损值不一致, UI:{expected_fixed_loss}, 内存:{actual_fixed_loss}"
+                        )
+                        self.orders[i]["fixed_loss"] = actual_fixed_loss
+                    else:
+                        print(f"{order_key}固定亏损保存成功: {actual_fixed_loss}")
+
+                    # 验证其他关键字段
+                    self.orders[i]["sl_points"] = updated_defaults[order_key].get(
+                        "sl_points", self.orders[i]["sl_points"]
+                    )
+                    self.orders[i]["tp_points"] = updated_defaults[order_key].get(
+                        "tp_points", self.orders[i]["tp_points"]
+                    )
+                    self.orders[i]["sl_candle"] = updated_defaults[order_key].get(
+                        "sl_candle", self.orders[i]["sl_candle"]
+                    )
+                    self.orders[i]["checked"] = updated_defaults[order_key].get(
+                        "checked", self.orders[i]["checked"]
+                    )
             else:
                 print("批量订单设置保存失败")
             return result
