@@ -360,8 +360,8 @@ class TradingButtonsSection:
                     )
 
                 # 更新界面
-                self.gui_window.components["account_info"].update_pnl_display(
-                    self.trader, self.gui_window.db
+                self.gui_window.components["pnl_info"].update_daily_pnl_info(
+                    self.trader
                 )
                 self.gui_window.components["account_info"].update_account_info(
                     self.trader
@@ -507,8 +507,8 @@ class TradingButtonsSection:
                     )
 
                 # 更新界面
-                self.gui_window.components["account_info"].update_pnl_display(
-                    self.trader, self.gui_window.db
+                self.gui_window.components["pnl_info"].update_daily_pnl_info(
+                    self.trader
                 )
                 self.gui_window.components["account_info"].update_account_info(
                     self.trader
@@ -565,6 +565,34 @@ class TradingButtonsSection:
 
             if success_count == len(positions):
                 self.gui_window.status_bar.showMessage("所有订单平仓成功！")
+
+                # 立即同步平仓记录到Excel
+                try:
+                    self.trader.sync_closed_trades_to_excel()
+                    print("已同步平仓记录到Excel")
+                except Exception as e:
+                    print(f"同步平仓记录到Excel失败: {str(e)}")
+
+                # 立即重新统计交易次数
+                try:
+                    if self.gui_window.db.auto_update_trade_count_from_xlsx(
+                        self.trader
+                    ):
+                        # 更新界面显示
+                        account_info = self.gui_window.components["account_info"]
+                        account_info.update_trade_count_display(self.gui_window.db)
+                        print("已更新交易次数统计")
+                except Exception as e:
+                    print(f"更新交易次数统计失败: {str(e)}")
+
+                # 更新盈亏显示
+                try:
+                    pnl_info = self.gui_window.components["pnl_info"]
+                    pnl_info.update_daily_pnl_info(self.trader)
+                    print("已更新盈亏显示")
+                except Exception as e:
+                    print(f"更新盈亏显示失败: {str(e)}")
+
             else:
                 self.gui_window.status_bar.showMessage(
                     f"部分订单平仓失败！成功：{success_count}/{len(positions)}"

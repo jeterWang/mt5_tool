@@ -40,30 +40,42 @@ class PnlInfoSection:
             trading_day = trader.get_trading_day()
             # 获取账户ID
             account_id = trader._get_account_id()
-            # 获取Excel文件路径
-            excel_path = os.path.join(get_data_path(), "trade_history.xlsx")
+            # 获取Excel文件路径（改为trade_records.xlsx）
+            excel_path = os.path.join(get_data_path(), "trade_records.xlsx")
             # 读取已实现盈亏
             realized_pnl = 0
             if os.path.exists(excel_path):
                 try:
-                    df = pd.read_excel(excel_path, sheet_name=account_id)
-                    # 过滤出今日的已实现盈亏
-                    df["date"] = pd.to_datetime(df["date"])
-                    today_df = df[df["date"].dt.strftime("%Y-%m-%d") == trading_day]
-                    realized_pnl = today_df["realized_pnl"].sum()
+                    df = pd.read_excel(excel_path, sheet_name=str(account_id))
+                    if not df.empty and "profit" in df.columns:
+                        # 优先使用trading_day字段，如果没有再使用close_time
+                        if "trading_day" in df.columns:
+                            # 直接按trading_day字段过滤
+                            today_df = df[df["trading_day"] == trading_day]
+                            realized_pnl = today_df["profit"].sum()
+                        elif "close_time" in df.columns:
+                            # 兼容旧数据格式，按close_time过滤
+                            df["close_time"] = pd.to_datetime(df["close_time"])
+                            today_df = df[
+                                df["close_time"].dt.strftime("%Y-%m-%d") == trading_day
+                            ]
+                            realized_pnl = today_df["profit"].sum()
+                        print(f"今日({trading_day})已实现盈亏: {realized_pnl:.2f}")
+                    else:
+                        print("trade_records.xlsx中缺少profit字段或文件为空")
                 except Exception as e:
                     print(f"读取已实现盈亏数据出错: {str(e)}")
-                    # 如果找不到worksheet，则新建一个
-                    if "Worksheet named" in str(e) and "not found" in str(e):
-                        print("没有worksheet就新建一个")
-                        df = pd.DataFrame(columns=["date", "realized_pnl"])
-                        df.to_excel(excel_path, sheet_name=account_id, index=False)
-                        realized_pnl = 0
+                    realized_pnl = 0
+            else:
+                print(f"trade_records.xlsx文件不存在: {excel_path}")
+
             # 获取浮动盈亏
             positions = trader.get_all_positions()
             unrealized_pnl = (
                 sum(position["profit"] for position in positions) if positions else 0
             )
+            print(f"当前浮动盈亏: {unrealized_pnl:.2f}")
+
             # 计算总盈亏
             total = realized_pnl + unrealized_pnl
             # 更新显示
@@ -81,6 +93,7 @@ class PnlInfoSection:
                 )
                 self.total_pnl_label.setText(f"日内总盈亏: {total:.2f}")
         except Exception as e:
+            print(f"更新盈亏信息出错: {str(e)}")
             self.realized_label.setText("今日已实现盈亏: --")
             self.unrealized_label.setText("当前浮动盈亏: --")
             self.total_pnl_label.setText("日内总盈亏: --")
