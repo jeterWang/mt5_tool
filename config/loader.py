@@ -34,6 +34,12 @@ SL_MODE = {
     "CANDLE_LOOKBACK": 3,  # 使用K线关键位模式时，向前看几根K线
 }
 
+# 仓位计算模式
+POSITION_SIZING = {
+    "DEFAULT_MODE": "MANUAL",  # 默认手动设置手数模式，可选：MANUAL, FIXED_LOSS
+    "DEFAULT_FIXED_LOSS": 10.0,  # 默认固定亏损金额（美元）
+}
+
 # 突破设置
 BREAKOUT_SETTINGS = {
     "HIGH_OFFSET_POINTS": 10,  # 高点突破偏移点数
@@ -102,7 +108,7 @@ def load_config():
     # 声明使用全局变量
     global SYMBOLS, DEFAULT_TIMEFRAME, Delta_TIMEZONE, TRADING_DAY_RESET_HOUR
     global DAILY_LOSS_LIMIT, DAILY_TRADE_LIMIT, GUI_SETTINGS, SL_MODE, BATCH_ORDER_DEFAULTS
-    global BREAKOUT_SETTINGS
+    global BREAKOUT_SETTINGS, POSITION_SIZING
 
     try:
         config_path = get_config_path()
@@ -142,6 +148,8 @@ def load_config():
                     GUI_SETTINGS.update(config["GUI_SETTINGS"])
                 if "SL_MODE" in config:
                     SL_MODE.update(config["SL_MODE"])
+                if "POSITION_SIZING" in config:
+                    POSITION_SIZING.update(config["POSITION_SIZING"])
                 if "BREAKOUT_SETTINGS" in config:
                     BREAKOUT_SETTINGS.update(config["BREAKOUT_SETTINGS"])
                 if "BATCH_ORDER_DEFAULTS" in config:
@@ -174,6 +182,11 @@ def load_config():
                     if "sl_candle" not in order_data:
                         print(f"load_config: {order_key}缺少sl_candle字段，使用默认值3")
                         order_data["sl_candle"] = 3
+                    if "fixed_loss" not in order_data:
+                        print(
+                            f"load_config: {order_key}缺少fixed_loss字段，使用默认值{POSITION_SIZING['DEFAULT_FIXED_LOSS']}"
+                        )
+                        order_data["fixed_loss"] = POSITION_SIZING["DEFAULT_FIXED_LOSS"]
 
                 return config
         else:
@@ -196,7 +209,7 @@ def save_config():
     # 声明所有全局变量
     global SYMBOLS, DEFAULT_TIMEFRAME, Delta_TIMEZONE, TRADING_DAY_RESET_HOUR
     global DAILY_LOSS_LIMIT, DAILY_TRADE_LIMIT, GUI_SETTINGS, SL_MODE, BREAKOUT_SETTINGS
-    global BATCH_ORDER_DEFAULTS
+    global BATCH_ORDER_DEFAULTS, POSITION_SIZING
 
     try:
         print(f"save_config: 保存前SYMBOLS = {SYMBOLS}")  # 调试信息
@@ -220,6 +233,14 @@ def save_config():
             if "sl_candle" not in order_data:
                 print(f"save_config: {order_key}缺少sl_candle字段，使用默认值3")
                 order_data["sl_candle"] = 3
+            if "fixed_loss" not in order_data:
+                print(
+                    f"save_config: {order_key}缺少fixed_loss字段，使用默认值{POSITION_SIZING['DEFAULT_FIXED_LOSS']}"
+                )
+                order_data["fixed_loss"] = POSITION_SIZING["DEFAULT_FIXED_LOSS"]
+            if "checked" not in order_data:
+                print(f"save_config: {order_key}缺少checked字段，使用默认值True")
+                order_data["checked"] = True
 
         # 使用深拷贝避免引用问题
         import copy
@@ -237,6 +258,7 @@ def save_config():
             "SL_MODE": SL_MODE.copy(),  # 使用深拷贝确保不会有引用问题
             "BREAKOUT_SETTINGS": BREAKOUT_SETTINGS.copy(),  # 使用深拷贝确保不会有引用问题
             "BATCH_ORDER_DEFAULTS": batch_defaults_copy,
+            "POSITION_SIZING": POSITION_SIZING.copy(),  # 使用深拷贝确保不会有引用问题
         }
 
         config_path = get_config_path()
@@ -366,7 +388,7 @@ def load_saved_config_to_memory(saved_config):
     """
     global SYMBOLS, DEFAULT_TIMEFRAME, Delta_TIMEZONE, TRADING_DAY_RESET_HOUR
     global DAILY_LOSS_LIMIT, DAILY_TRADE_LIMIT, GUI_SETTINGS, SL_MODE, BATCH_ORDER_DEFAULTS
-    global BREAKOUT_SETTINGS
+    global BREAKOUT_SETTINGS, POSITION_SIZING
 
     if "SYMBOLS" in saved_config:
         SYMBOLS.clear()
@@ -403,6 +425,9 @@ def load_saved_config_to_memory(saved_config):
         batch_defaults_copy = copy.deepcopy(saved_config["BATCH_ORDER_DEFAULTS"])
         BATCH_ORDER_DEFAULTS.clear()
         BATCH_ORDER_DEFAULTS.update(batch_defaults_copy)
+
+    if "POSITION_SIZING" in saved_config:
+        POSITION_SIZING.update(saved_config["POSITION_SIZING"])
 
     print("load_saved_config_to_memory: 已将文件中的配置应用到内存")
 

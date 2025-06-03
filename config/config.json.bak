@@ -8,7 +8,7 @@
     "Delta_TIMEZONE": 0,
     "TRADING_DAY_RESET_HOUR": 20,
     "DAILY_LOSS_LIMIT": 150.0,
-    "DAILY_TRADE_LIMIT": 10,
+    "DAILY_TRADE_LIMIT": 20,
     "GUI_SETTINGS": {
         "WINDOW_TOP": true,
         "SOUND_ALERT": false,
@@ -32,28 +32,36 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "checked": true
+            "checked": true,
+            "fixed_loss": 5.0
         },
         "order2": {
             "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "checked": true
+            "checked": true,
+            "fixed_loss": 5.0
         },
         "order3": {
             "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "checked": true
+            "checked": true,
+            "fixed_loss": 5.0
         },
         "order4": {
             "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "checked": false
+            "checked": false,
+            "fixed_loss": 5.0
         }
+    },
+    "POSITION_SIZING": {
+        "DEFAULT_MODE": "FIXED_LOSS",
+        "DEFAULT_FIXED_LOSS": 15.0
     }
 }

@@ -5,7 +5,7 @@
 """
 
 from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QLabel, QComboBox
-from config.loader import SYMBOLS, SL_MODE
+from config.loader import SYMBOLS, SL_MODE, POSITION_SIZING
 
 
 class TradingSettingsSection:
@@ -42,6 +42,20 @@ class TradingSettingsSection:
         row1_layout.addWidget(self.sl_mode_combo)
 
         self.layout.addLayout(row1_layout)
+
+        # 添加仓位计算模式选择
+        row2_layout = QHBoxLayout()
+        self.position_sizing_combo = QComboBox()
+        self.position_sizing_combo.addItems(["手动设置手数", "固定亏损计算仓位"])
+        if POSITION_SIZING["DEFAULT_MODE"] == "MANUAL":
+            self.position_sizing_combo.setCurrentIndex(0)
+        else:
+            self.position_sizing_combo.setCurrentIndex(1)
+
+        row2_layout.addWidget(QLabel("仓位计算:"))
+        row2_layout.addWidget(self.position_sizing_combo)
+
+        self.layout.addLayout(row2_layout)
 
     def on_symbol_changed(self, symbol: str, trader):
         """
@@ -86,6 +100,21 @@ class TradingSettingsSection:
         from app.gui.batch_order import update_sl_mode
 
         return SL_MODE["DEFAULT_MODE"]
+
+    def on_position_sizing_changed(self, index):
+        """
+        当仓位计算模式改变时更新UI和参数
+
+        Args:
+            index: 选择的索引，0表示手动设置手数，1表示固定亏损计算仓位
+        """
+        # 保存当前选择的仓位计算模式
+        POSITION_SIZING["DEFAULT_MODE"] = "MANUAL" if index == 0 else "FIXED_LOSS"
+
+        # 通知批量下单设置更新UI
+        from app.gui.batch_order import update_position_sizing_mode
+
+        return POSITION_SIZING["DEFAULT_MODE"]
 
     def update_symbols_list(self, trader):
         """

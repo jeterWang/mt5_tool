@@ -16,8 +16,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from PyQt6.QtCore import Qt
-from config.loader import BATCH_ORDER_DEFAULTS, SL_MODE, save_config
+from config.loader import BATCH_ORDER_DEFAULTS, SL_MODE, POSITION_SIZING, save_config
 from PyQt6.QtGui import QIcon
+import MetaTrader5 as mt5
 
 
 # 全局变量，用于存储当前实例
@@ -41,7 +42,7 @@ class BatchOrderSection:
         # 订单数据结构
         self.orders = (
             []
-        )  # 每个元素是dict: {volume, sl_points, tp_points, sl_candle, checked}
+        )  # 每个元素是dict: {volume, sl_points, tp_points, sl_candle, fixed_loss, checked}
         self.order_rows = []  # 每行控件的引用，便于删除
 
         # 添加新单按钮
@@ -69,6 +70,9 @@ class BatchOrderSection:
                     "sl_candle": BATCH_ORDER_DEFAULTS[key].get(
                         "sl_candle", SL_MODE["CANDLE_LOOKBACK"]
                     ),
+                    "fixed_loss": BATCH_ORDER_DEFAULTS[key].get(
+                        "fixed_loss", POSITION_SIZING["DEFAULT_FIXED_LOSS"]
+                    ),
                     "checked": BATCH_ORDER_DEFAULTS[key].get("checked", True),
                 }
                 self.orders.append(order)
@@ -80,11 +84,13 @@ class BatchOrderSection:
                     "sl_points": 0,
                     "tp_points": 0,
                     "sl_candle": SL_MODE["CANDLE_LOOKBACK"],
+                    "fixed_loss": POSITION_SIZING["DEFAULT_FIXED_LOSS"],
                     "checked": True,
                 }
             )
         self.refresh_orders_ui()
         self.update_sl_mode(SL_MODE["DEFAULT_MODE"])
+        self.update_position_sizing_mode(POSITION_SIZING["DEFAULT_MODE"])
 
     def refresh_orders_ui(self):
         # 清除原有行
@@ -109,7 +115,9 @@ class BatchOrderSection:
             # 标签
             row_layout.addWidget(QLabel(f"第{idx+1}单:"))
 
-            # 手数
+            # 手数/固定亏损（根据模式显示）
+            volume_label = QLabel("手数:")
+            row_layout.addWidget(volume_label)
             volume_input = QDoubleSpinBox()
             volume_input.setRange(0.01, 100)
             volume_input.setSingleStep(0.01)
@@ -117,8 +125,19 @@ class BatchOrderSection:
             volume_input.valueChanged.connect(
                 lambda val, i=idx: self.on_value_changed(i, "volume", val)
             )
-            row_layout.addWidget(QLabel("手数:"))
             row_layout.addWidget(volume_input)
+
+            # 固定亏损输入框
+            fixed_loss_label = QLabel("亏损($):")
+            row_layout.addWidget(fixed_loss_label)
+            fixed_loss_input = QDoubleSpinBox()
+            fixed_loss_input.setRange(1.0, 10000.0)
+            fixed_loss_input.setSingleStep(1.0)
+            fixed_loss_input.setValue(order["fixed_loss"])
+            fixed_loss_input.valueChanged.connect(
+                lambda val, i=idx: self.on_value_changed(i, "fixed_loss", val)
+            )
+            row_layout.addWidget(fixed_loss_input)
 
             # 止损点数/K线回溯
             sl_label = QLabel("止损点数:")
@@ -163,7 +182,10 @@ class BatchOrderSection:
                 {
                     "widget": row_widget,
                     "check": check,
+                    "volume_label": volume_label,
                     "volume": volume_input,
+                    "fixed_loss_label": fixed_loss_label,
+                    "fixed_loss": fixed_loss_input,
                     "sl_label": sl_label,
                     "sl_points": sl_points_input,
                     "sl_candle": sl_candle_input,
@@ -181,10 +203,14 @@ class BatchOrderSection:
                 "sl_points": 0,
                 "tp_points": 0,
                 "sl_candle": SL_MODE["CANDLE_LOOKBACK"],
+                "fixed_loss": POSITION_SIZING["DEFAULT_FIXED_LOSS"],
                 "checked": True,
             }
         )
         self.refresh_orders_ui()
+        # 重新应用当前模式设置
+        self.update_sl_mode(SL_MODE["DEFAULT_MODE"])
+        self.update_position_sizing_mode(POSITION_SIZING["DEFAULT_MODE"])
         self.save_batch_settings()
 
     def delete_order(self, idx):
@@ -192,6 +218,9 @@ class BatchOrderSection:
             return
         self.orders.pop(idx)
         self.refresh_orders_ui()
+        # 重新应用当前模式设置
+        self.update_sl_mode(SL_MODE["DEFAULT_MODE"])
+        self.update_position_sizing_mode(POSITION_SIZING["DEFAULT_MODE"])
         self.save_batch_settings()
 
     def on_checked_changed(self, idx, state):
@@ -200,7 +229,141 @@ class BatchOrderSection:
 
     def on_value_changed(self, idx, key, value):
         self.orders[idx][key] = value
+
+        # 固定亏损模式下，手数在下单时计算，这里不预先计算
+        # 因为需要确定交易方向和实际入场价格才能准确计算
+
         self.save_batch_settings()
+
+    def calculate_position_size_for_order(
+        self, order_idx, order_type, entry_price, symbol
+    ):
+        """
+        为具体订单计算仓位大小（在下单时调用）
+
+        Args:
+            order_idx: 订单索引
+            order_type: 交易类型 ('buy' 或 'sell')
+            entry_price: 入场价格
+            symbol: 交易品种
+
+        Returns:
+            计算出的仓位大小（手数）
+        """
+        try:
+            import MetaTrader5 as mt5
+
+            order = self.orders[order_idx]
+            fixed_loss = order["fixed_loss"]
+
+            symbol_info = mt5.symbol_info(symbol)
+            if not symbol_info:
+                return 0
+
+            point = symbol_info.point
+
+            # 根据交易方向和止损模式计算止损价格
+            sl_mode = SL_MODE["DEFAULT_MODE"]
+            sl_price = 0
+
+            if sl_mode == "FIXED_POINTS":
+                sl_points = order["sl_points"]
+                if sl_points > 0:
+                    if order_type == "buy":
+                        # 买入订单，止损在入场价下方
+                        sl_price = entry_price - sl_points * point
+                    else:  # sell
+                        # 卖出订单，止损在入场价上方
+                        sl_price = entry_price + sl_points * point
+            else:
+                # K线关键位模式，需要获取K线数据
+                from app.gui.main_window import get_current_trader_and_window
+
+                trader, gui_window = get_current_trader_and_window()
+
+                if gui_window:
+                    countdown = gui_window.components.get("countdown")
+                    if countdown:
+                        timeframe = countdown.timeframe_combo.currentText()
+                        lookback = order["sl_candle"]
+                        timeframe_mt5 = self.get_timeframe(timeframe)
+                        rates = mt5.copy_rates_from_pos(
+                            symbol, timeframe_mt5, 0, lookback + 2
+                        )
+                        if rates is not None and len(rates) >= lookback + 2:
+                            lowest_point = min([rate["low"] for rate in rates[2:]])
+                            highest_point = max([rate["high"] for rate in rates[2:]])
+                            # 添加偏移
+                            from config.loader import BREAKOUT_SETTINGS
+
+                            sl_offset = BREAKOUT_SETTINGS["SL_OFFSET_POINTS"] * point
+
+                            if order_type == "buy":
+                                sl_price = lowest_point - sl_offset
+                            else:  # sell
+                                sl_price = highest_point + sl_offset
+
+            if sl_price <= 0:
+                return 0
+
+            # 验证止损价格的合理性
+            if order_type == "buy" and sl_price >= entry_price:
+                print(
+                    f"买入订单止损价格{sl_price}高于入场价格{entry_price}，无法计算仓位"
+                )
+                return 0
+            elif order_type == "sell" and sl_price <= entry_price:
+                print(
+                    f"卖出订单止损价格{sl_price}低于入场价格{entry_price}，无法计算仓位"
+                )
+                return 0
+
+            # 计算价格差距（风险金额）
+            price_diff = abs(entry_price - sl_price)
+
+            # 获取合约大小
+            contract_size = symbol_info.trade_contract_size
+
+            # 计算仓位大小
+            # 公式：仓位大小 = 固定亏损金额 / (价格差距 * 合约大小)
+            position_size = fixed_loss / (price_diff * contract_size)
+
+            # 确保符合品种的最小/最大手数要求
+            min_volume = symbol_info.volume_min
+            max_volume = symbol_info.volume_max
+            volume_step = symbol_info.volume_step
+
+            # 调整到最接近的有效手数
+            position_size = max(min_volume, min(max_volume, position_size))
+            position_size = round(position_size / volume_step) * volume_step
+
+            print(
+                f"固定亏损计算: {order_type}单, 入场价{entry_price}, 止损价{sl_price}, 风险金额{price_diff}, 计算手数{position_size}"
+            )
+
+            return position_size
+
+        except Exception as e:
+            print(f"计算仓位大小出错: {str(e)}")
+            return 0
+
+    def calculate_position_size(self, order_idx):
+        """
+        旧方法，保留用于向后兼容，但不再使用
+        """
+        return 0
+
+    def get_timeframe(self, timeframe: str) -> int:
+        """将时间周期字符串转换为MT5的时间周期常量"""
+        timeframe_map = {
+            "M1": mt5.TIMEFRAME_M1,
+            "M5": mt5.TIMEFRAME_M5,
+            "M15": mt5.TIMEFRAME_M15,
+            "M30": mt5.TIMEFRAME_M30,
+            "H1": mt5.TIMEFRAME_H1,
+            "H4": mt5.TIMEFRAME_H4,
+        }
+        return timeframe_map.get(timeframe, mt5.TIMEFRAME_M1)
 
     def save_batch_settings(self):
         """实时保存批量订单设置"""
@@ -217,13 +380,15 @@ class BatchOrderSection:
                     "sl_points": order["sl_points"],
                     "tp_points": order["tp_points"],
                     "sl_candle": order["sl_candle"],
+                    "fixed_loss": order["fixed_loss"],
                     "checked": order["checked"],
                 }
                 print(
                     f"批量订单{valid_count+1}设置: 手数={order['volume']}, "
                     f"止损点数={order['sl_points']}, "
                     f"止盈点数={order['tp_points']}, "
-                    f"K线回溯={order['sl_candle']}"
+                    f"K线回溯={order['sl_candle']}, "
+                    f"固定亏损={order['fixed_loss']}"
                 )
                 valid_count += 1
             # 清理多余的orderN
@@ -276,6 +441,31 @@ class BatchOrderSection:
                 row["sl_points"].setVisible(False)
                 row["sl_candle"].setVisible(True)
 
+    def update_position_sizing_mode(self, mode):
+        """
+        更新仓位计算模式
+
+        Args:
+            mode: 仓位计算模式，'MANUAL'或'FIXED_LOSS'
+        """
+        # 根据仓位计算模式切换显示
+        for row in self.order_rows:
+            if mode == "MANUAL":
+                row["volume_label"].setText("手数:")
+                row["volume"].setVisible(True)
+                row["volume"].setEnabled(True)
+                row["volume"].setSuffix("")  # 清除后缀
+                row["fixed_loss_label"].setVisible(False)
+                row["fixed_loss"].setVisible(False)
+            else:  # FIXED_LOSS
+                row["volume_label"].setText("计算手数:")
+                row["volume"].setVisible(True)
+                row["volume"].setEnabled(False)  # 禁用手动编辑
+                row["volume"].setValue(0.0)  # 设置为0，表示待计算
+                row["volume"].setSuffix(" (下单时计算)")  # 添加后缀说明
+                row["fixed_loss_label"].setVisible(True)
+                row["fixed_loss"].setVisible(True)
+
     def update_symbol_params(self, symbol_params):
         """
         更新交易品种参数
@@ -308,6 +498,18 @@ def update_sl_mode(mode):
     global _instance
     if _instance:
         _instance.update_sl_mode(mode)
+
+
+def update_position_sizing_mode(mode):
+    """
+    更新仓位计算模式，供外部模块调用
+
+    Args:
+        mode: 仓位计算模式，'MANUAL'或'FIXED_LOSS'
+    """
+    global _instance
+    if _instance:
+        _instance.update_position_sizing_mode(mode)
 
 
 def update_symbol_params(symbol_params):

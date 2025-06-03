@@ -8,7 +8,13 @@ from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton
 import MetaTrader5 as mt5
 import winsound
 
-from config.loader import GUI_SETTINGS, BATCH_ORDER_DEFAULTS, SL_MODE, BREAKOUT_SETTINGS
+from config.loader import (
+    GUI_SETTINGS,
+    BATCH_ORDER_DEFAULTS,
+    SL_MODE,
+    BREAKOUT_SETTINGS,
+    POSITION_SIZING,
+)
 from app.gui.risk_control import check_trade_limit
 
 
@@ -310,13 +316,51 @@ class TradingButtonsSection:
             # 下所有勾选的订单
             orders = []
             for i, order in enumerate(batch_order.orders):
-                if not order["checked"] or order["volume"] <= 0:
+                if not order["checked"]:
                     continue
+
+                # 检查仓位计算模式
+                position_sizing_mode = POSITION_SIZING["DEFAULT_MODE"]
+                volume = order["volume"]
+
+                # 如果是固定亏损模式，需要先获取当前价格来计算仓位
+                if position_sizing_mode == "FIXED_LOSS":
+                    if order["fixed_loss"] <= 0:
+                        print(f"订单{i+1}：固定亏损金额无效，跳过")
+                        continue
+
+                    # 获取当前价格作为入场价参考
+                    tick = mt5.symbol_info_tick(symbol)
+                    if not tick:
+                        print(f"订单{i+1}：无法获取当前价格，跳过")
+                        continue
+
+                    # 根据订单类型选择入场价
+                    entry_price = tick.ask if order_type == "buy" else tick.bid
+
+                    # 计算仓位大小
+                    calculated_volume = batch_order.calculate_position_size_for_order(
+                        i, order_type, entry_price, symbol
+                    )
+
+                    if calculated_volume <= 0:
+                        print(f"订单{i+1}：仓位计算失败，跳过")
+                        continue
+
+                    volume = calculated_volume
+                    print(
+                        f"订单{i+1}：固定亏损{order['fixed_loss']}美元，计算手数{volume}"
+                    )
+
+                elif volume <= 0:
+                    print(f"订单{i+1}：手数无效，跳过")
+                    continue
+
                 if sl_mode == "FIXED_POINTS":
                     mt5_order = self.trader.place_order_with_tp_sl(
                         symbol=symbol,
                         order_type=order_type,
-                        volume=order["volume"],
+                        volume=volume,
                         sl_points=order["sl_points"],
                         tp_points=order["tp_points"],
                         comment=f"批量下单{i+1}",
@@ -342,7 +386,7 @@ class TradingButtonsSection:
                     mt5_order = self.trader.place_order_with_key_level_sl(
                         symbol=symbol,
                         order_type=order_type,
-                        volume=order["volume"],
+                        volume=volume,
                         sl_price=sl_price,
                         tp_points=order["tp_points"],
                         comment=f"批量下单{i+1}",
@@ -456,8 +500,40 @@ class TradingButtonsSection:
             orders = []
             order_details = []
             for i, order in enumerate(batch_order.orders):
-                if not order["checked"] or order["volume"] <= 0:
+                if not order["checked"]:
                     continue
+
+                # 检查仓位计算模式
+                position_sizing_mode = POSITION_SIZING["DEFAULT_MODE"]
+                volume = order["volume"]
+
+                # 如果是固定亏损模式，计算仓位大小
+                if position_sizing_mode == "FIXED_LOSS":
+                    if order["fixed_loss"] <= 0:
+                        print(f"突破订单{i+1}：固定亏损金额无效，跳过")
+                        continue
+
+                    # 根据突破类型确定订单方向
+                    order_direction = "buy" if breakout_type == "high" else "sell"
+
+                    # 计算仓位大小
+                    calculated_volume = batch_order.calculate_position_size_for_order(
+                        i, order_direction, entry_price, symbol
+                    )
+
+                    if calculated_volume <= 0:
+                        print(f"突破订单{i+1}：仓位计算失败，跳过")
+                        continue
+
+                    volume = calculated_volume
+                    print(
+                        f"突破订单{i+1}：固定亏损{order['fixed_loss']}美元，计算手数{volume}"
+                    )
+
+                elif volume <= 0:
+                    print(f"突破订单{i+1}：手数无效，跳过")
+                    continue
+
                 sl_price = None
                 if sl_mode == "FIXED_POINTS":
                     if breakout_type == "high":
@@ -485,7 +561,7 @@ class TradingButtonsSection:
                 mt5_order = self.trader.place_pending_order(
                     symbol=symbol,
                     order_type=order_type,
-                    volume=order["volume"],
+                    volume=volume,
                     price=entry_price,
                     sl_price=sl_price,
                     tp_points=order["tp_points"],
@@ -494,7 +570,7 @@ class TradingButtonsSection:
                 if mt5_order:
                     orders.append(mt5_order)
                     order_details.append(
-                        f"订单{i+1}: K线数={order['sl_candle']}, 止损价={sl_price:.5f}"
+                        f"订单{i+1}: 手数={volume:.2f}, 止损价={sl_price:.5f}"
                     )
 
             if orders:

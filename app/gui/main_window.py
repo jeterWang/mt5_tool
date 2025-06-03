@@ -25,7 +25,14 @@ import os
 from utils.paths import get_icon_path, get_font_path
 from app.trader import MT5Trader
 from app.database import TradeDatabase
-from config.loader import GUI_SETTINGS, SL_MODE, SYMBOLS, load_config, DAILY_TRADE_LIMIT
+from config.loader import (
+    GUI_SETTINGS,
+    SL_MODE,
+    SYMBOLS,
+    load_config,
+    DAILY_TRADE_LIMIT,
+    POSITION_SIZING,
+)
 from app.gui.account_info import AccountInfoSection
 from app.gui.pnl_info import PnlInfoSection
 from app.gui.countdown import CountdownSection
@@ -34,6 +41,22 @@ from app.gui.batch_order import BatchOrderSection
 from app.gui.trading_buttons import TradingButtonsSection
 from app.gui.positions_table import PositionsTableSection
 from app.gui.settings import show_settings_dialog
+
+
+# 全局引用，供其他模块使用
+_current_trader = None
+_current_window = None
+
+
+def get_current_trader_and_window():
+    """
+    获取当前的trader和window引用
+
+    Returns:
+        tuple: (trader, window) 或 (None, None)
+    """
+    global _current_trader, _current_window
+    return _current_trader, _current_window
 
 
 def load_chinese_font():
@@ -54,6 +77,10 @@ class MT5GUI(QMainWindow):
     def __init__(self):
         """初始化GUI界面"""
         super().__init__()
+
+        # 设置全局引用
+        global _current_window
+        _current_window = self
 
         # 确保在初始化前加载最新配置
         print(f"MT5GUI初始化前SYMBOLS = {SYMBOLS}")
@@ -198,6 +225,13 @@ class MT5GUI(QMainWindow):
             self.on_sl_mode_changed
         )
 
+        # 连接仓位计算模式改变信号
+        self.components[
+            "trading_settings"
+        ].position_sizing_combo.currentIndexChanged.connect(
+            self.on_position_sizing_changed
+        )
+
         # 添加批量下单设置组
         self.components["batch_order"] = BatchOrderSection()
         main_layout.addWidget(self.components["batch_order"].group_box)
@@ -257,12 +291,31 @@ class MT5GUI(QMainWindow):
 
         update_sl_mode(mode)
 
+    def on_position_sizing_changed(self, index):
+        """
+        处理仓位计算模式变更
+
+        Args:
+            index: 仓位计算模式索引，0为手动设置手数，1为固定亏损计算仓位
+        """
+        # 更新trading_settings模块中的设置
+        mode = self.components["trading_settings"].on_position_sizing_changed(index)
+
+        # 通过模块级函数更新批量下单设置
+        from app.gui.batch_order import update_position_sizing_mode
+
+        update_position_sizing_mode(mode)
+
     def connect_mt5(self):
         """连接到MT5"""
         try:
             if self.trader is None:
                 # 创建交易者对象
                 self.trader = MT5Trader()
+
+                # 设置全局引用
+                global _current_trader
+                _current_trader = self.trader
 
                 # 尝试连接MT5
                 if not self.trader.connect():
@@ -451,11 +504,15 @@ class MT5GUI(QMainWindow):
         trading_settings.sl_mode_combo.setCurrentIndex(
             0 if SL_MODE["DEFAULT_MODE"] == "FIXED_POINTS" else 1
         )
+        trading_settings.position_sizing_combo.setCurrentIndex(
+            0 if POSITION_SIZING["DEFAULT_MODE"] == "MANUAL" else 1
+        )
 
         # 更新批量下单设置
-        from app.gui.batch_order import update_sl_mode
+        from app.gui.batch_order import update_sl_mode, update_position_sizing_mode
 
         update_sl_mode(SL_MODE["DEFAULT_MODE"])
+        update_position_sizing_mode(POSITION_SIZING["DEFAULT_MODE"])
 
         # 重新加载交易限制设置
         self.update_trading_limits()
