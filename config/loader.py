@@ -9,51 +9,29 @@ import json
 import sys
 
 # 基础配置
-SYMBOLS = ["BTCUSD", "ETHUSD", "EURUSD", "GBPUSD", "XAUUSD", "XAGUSD"]
-DEFAULT_TIMEFRAME = "M1"
-Delta_TIMEZONE = 7  # MT5服务器时区与本地时区的差值(小时)
-TRADING_DAY_RESET_HOUR = 6  # 每天6点作为新交易日的开始
+SYMBOLS = None
+DEFAULT_TIMEFRAME = None
+Delta_TIMEZONE = None
+TRADING_DAY_RESET_HOUR = None
 
 # 风控设置
-DAILY_LOSS_LIMIT = 50  # 日亏损限额，单位为账户货币
-DAILY_TRADE_LIMIT = 20  # 日交易次数限制
+DAILY_LOSS_LIMIT = None
+DAILY_TRADE_LIMIT = None
 
 # GUI设置
-GUI_SETTINGS = {
-    "WINDOW_TOP": True,  # 窗口置顶
-    "SOUND_ALERT": True,  # 声音提醒
-    "ALERT_SECONDS": 30,  # 提前30秒提醒
-    "BEEP_FREQUENCY": 750,  # 提示音频率
-    "BEEP_DURATION": 800,  # 提示音持续时间
-    "BREAKEVEN_OFFSET_POINTS": 0,  # 一键保本偏移点数
-}
+GUI_SETTINGS = None
 
 # 止损模式
-SL_MODE = {
-    "DEFAULT_MODE": "FIXED_POINTS",  # 默认固定点数止损
-    "CANDLE_LOOKBACK": 3,  # 使用K线关键位模式时，向前看几根K线
-}
+SL_MODE = None
 
 # 仓位计算模式
-POSITION_SIZING = {
-    "DEFAULT_MODE": "MANUAL",  # 默认手动设置手数模式，可选：MANUAL, FIXED_LOSS
-    "DEFAULT_FIXED_LOSS": 10.0,  # 默认固定亏损金额（美元）
-}
+POSITION_SIZING = None
 
 # 突破设置
-BREAKOUT_SETTINGS = {
-    "HIGH_OFFSET_POINTS": 10,  # 高点突破偏移点数
-    "LOW_OFFSET_POINTS": 10,  # 低点突破偏移点数
-    "SL_OFFSET_POINTS": 100,  # 止损偏移点数
-}
+BREAKOUT_SETTINGS = None
 
 # 批量订单默认参数
-BATCH_ORDER_DEFAULTS = {
-    "order1": {"volume": 0.10, "sl_points": 3000, "tp_points": 1000, "sl_candle": 3},
-    "order2": {"volume": 0.10, "sl_points": 3000, "tp_points": 1500, "sl_candle": 3},
-    "order3": {"volume": 0.10, "sl_points": 3000, "tp_points": 2000, "sl_candle": 3},
-    "order4": {"volume": 0.10, "sl_points": 3000, "tp_points": 2500, "sl_candle": 3},
-}
+BATCH_ORDER_DEFAULTS = None
 
 
 def get_config_path():
@@ -100,103 +78,59 @@ def get_config_path():
 
 def load_config():
     """
-    加载配置
-
+    加载配置（只允许从config.json加载，缺失或字段不全时报错退出）
     Returns:
         配置字典
     """
-    # 声明使用全局变量
     global SYMBOLS, DEFAULT_TIMEFRAME, Delta_TIMEZONE, TRADING_DAY_RESET_HOUR
     global DAILY_LOSS_LIMIT, DAILY_TRADE_LIMIT, GUI_SETTINGS, SL_MODE, BATCH_ORDER_DEFAULTS
     global BREAKOUT_SETTINGS, POSITION_SIZING
 
+    config_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "config.json"
+    )
+    if not os.path.exists(config_path):
+        print(
+            f"[配置错误] 未找到配置文件: {config_path}\n请复制config.json.example为config.json并完善配置后重试！"
+        )
+        sys.exit(1)
     try:
-        config_path = get_config_path()
-        if os.path.exists(config_path):
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = json.load(f)
-                print(
-                    f"load_config: 读取到的配置文件SYMBOLS = {config.get('SYMBOLS', '未找到')}"
-                )  # 调试信息
-                print(
-                    f"load_config: 读取到的配置文件DAILY_TRADE_LIMIT = {config.get('DAILY_TRADE_LIMIT', '未找到')}"
-                )  # 调试信息
-                print(
-                    f"load_config: 读取到的配置文件BATCH_ORDER_DEFAULTS = {config.get('BATCH_ORDER_DEFAULTS', '未找到')}"
-                )  # 调试信息
-
-                # 更新全局变量
-                if "SYMBOLS" in config:
-                    # 清空当前列表并扩展，而不是直接赋值
-                    SYMBOLS.clear()
-                    SYMBOLS.extend(config["SYMBOLS"])
-                    print(f"load_config: 加载后SYMBOLS = {SYMBOLS}")  # 调试信息
-                if "DEFAULT_TIMEFRAME" in config:
-                    DEFAULT_TIMEFRAME = config["DEFAULT_TIMEFRAME"]
-                if "Delta_TIMEZONE" in config:
-                    Delta_TIMEZONE = config["Delta_TIMEZONE"]
-                if "TRADING_DAY_RESET_HOUR" in config:
-                    TRADING_DAY_RESET_HOUR = config["TRADING_DAY_RESET_HOUR"]
-                if "DAILY_LOSS_LIMIT" in config:
-                    DAILY_LOSS_LIMIT = config["DAILY_LOSS_LIMIT"]
-                if "DAILY_TRADE_LIMIT" in config:
-                    DAILY_TRADE_LIMIT = config["DAILY_TRADE_LIMIT"]
-                    print(
-                        f"load_config: 加载后DAILY_TRADE_LIMIT = {DAILY_TRADE_LIMIT}"
-                    )  # 调试信息
-                if "GUI_SETTINGS" in config:
-                    GUI_SETTINGS.update(config["GUI_SETTINGS"])
-                if "SL_MODE" in config:
-                    SL_MODE.update(config["SL_MODE"])
-                if "POSITION_SIZING" in config:
-                    POSITION_SIZING.update(config["POSITION_SIZING"])
-                if "BREAKOUT_SETTINGS" in config:
-                    BREAKOUT_SETTINGS.update(config["BREAKOUT_SETTINGS"])
-                if "BATCH_ORDER_DEFAULTS" in config:
-                    # 使用深拷贝避免引用问题
-                    import copy
-
-                    batch_defaults_copy = copy.deepcopy(config["BATCH_ORDER_DEFAULTS"])
-                    BATCH_ORDER_DEFAULTS.clear()
-                    BATCH_ORDER_DEFAULTS.update(batch_defaults_copy)
-                    print(
-                        f"load_config: 加载后BATCH_ORDER_DEFAULTS = {BATCH_ORDER_DEFAULTS}"
-                    )  # 调试信息
-
-                # 验证批量下单设置中的关键字段
-                for order_key, order_data in BATCH_ORDER_DEFAULTS.items():
-                    # 确保每个订单设置都包含所有必要字段
-                    if "volume" not in order_data:
-                        print(f"load_config: {order_key}缺少volume字段，使用默认值0.1")
-                        order_data["volume"] = 0.1
-                    if "sl_points" not in order_data:
-                        print(
-                            f"load_config: {order_key}缺少sl_points字段，使用默认值3000"
-                        )
-                        order_data["sl_points"] = 3000
-                    if "tp_points" not in order_data:
-                        print(
-                            f"load_config: {order_key}缺少tp_points字段，使用默认值1000"
-                        )
-                        order_data["tp_points"] = 1000
-                    if "sl_candle" not in order_data:
-                        print(f"load_config: {order_key}缺少sl_candle字段，使用默认值3")
-                        order_data["sl_candle"] = 3
-                    if "fixed_loss" not in order_data:
-                        print(
-                            f"load_config: {order_key}缺少fixed_loss字段，使用默认值{POSITION_SIZING['DEFAULT_FIXED_LOSS']}"
-                        )
-                        order_data["fixed_loss"] = POSITION_SIZING["DEFAULT_FIXED_LOSS"]
-
-                return config
-        else:
-            print(f"配置文件不存在，将使用默认配置")
-            # 如果配置文件不存在，保存当前默认配置
-            save_config()
-        return {}
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        # 字段校验
+        required_fields = [
+            "SYMBOLS",
+            "DEFAULT_TIMEFRAME",
+            "Delta_TIMEZONE",
+            "TRADING_DAY_RESET_HOUR",
+            "DAILY_LOSS_LIMIT",
+            "DAILY_TRADE_LIMIT",
+            "GUI_SETTINGS",
+            "SL_MODE",
+            "POSITION_SIZING",
+            "BREAKOUT_SETTINGS",
+            "BATCH_ORDER_DEFAULTS",
+        ]
+        for field in required_fields:
+            if field not in config:
+                print(f"[配置错误] 缺少字段: {field}，请检查config.json！")
+                sys.exit(1)
+        # 赋值
+        SYMBOLS = config["SYMBOLS"]
+        DEFAULT_TIMEFRAME = config["DEFAULT_TIMEFRAME"]
+        Delta_TIMEZONE = config["Delta_TIMEZONE"]
+        TRADING_DAY_RESET_HOUR = config["TRADING_DAY_RESET_HOUR"]
+        DAILY_LOSS_LIMIT = config["DAILY_LOSS_LIMIT"]
+        DAILY_TRADE_LIMIT = config["DAILY_TRADE_LIMIT"]
+        GUI_SETTINGS = config["GUI_SETTINGS"]
+        SL_MODE = config["SL_MODE"]
+        POSITION_SIZING = config["POSITION_SIZING"]
+        BREAKOUT_SETTINGS = config["BREAKOUT_SETTINGS"]
+        BATCH_ORDER_DEFAULTS = config["BATCH_ORDER_DEFAULTS"]
+        return config
     except Exception as e:
-        print(f"加载配置出错：{str(e)}")
-        return {}
+        print(f"[配置错误] 解析config.json失败: {e}")
+        sys.exit(1)
 
 
 def save_config():

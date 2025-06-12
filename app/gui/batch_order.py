@@ -229,10 +229,8 @@ class BatchOrderSection:
 
     def on_value_changed(self, idx, key, value):
         self.orders[idx][key] = value
-
         # 固定亏损模式下，手数在下单时计算，这里不预先计算
-        # 因为需要确定交易方向和实际入场价格才能准确计算
-
+        # 盈亏平衡批量加仓时，参数变动后可在界面上提示用户"手数将在下单时自动计算"
         self.save_batch_settings()
 
     def calculate_position_size_for_order(
@@ -489,7 +487,7 @@ class BatchOrderSection:
                 row["volume"].setVisible(True)
                 row["volume"].setEnabled(False)  # 禁用手动编辑
                 row["volume"].setValue(0.0)  # 设置为0，表示待计算
-                row["volume"].setSuffix(" (下单时计算)")  # 添加后缀说明
+                row["volume"].setSuffix(" (下单时自动计算)")  # 添加后缀说明
                 row["fixed_loss_label"].setVisible(True)
                 row["fixed_loss"].setVisible(True)
 

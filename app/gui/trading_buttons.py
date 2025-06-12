@@ -302,60 +302,102 @@ class TradingButtonsSection:
                 else "CANDLE_KEY_LEVEL"
             )
 
-            # 如果是K线关键位止损，需要获取K线数据
-            if sl_mode == "CANDLE_KEY_LEVEL":
-                # 获取交易品种点值
-                symbol_info = mt5.symbol_info(symbol)
-                if symbol_info is None:
-                    self.gui_window.status_bar.showMessage(f"获取{symbol}信息失败！")
+            # 判断当前是否有同方向持仓
+            positions = self.trader.get_positions_by_symbol_and_type(symbol, order_type)
+            has_positions = bool(positions)
+
+            # 统计本次批量下单的有效订单数
+            checked_orders = [order for order in batch_order.orders if order["checked"]]
+            batch_count = len(checked_orders)
+            if batch_count == 0:
+                self.gui_window.status_bar.showMessage("未勾选任何批量下单订单！")
+                return
+
+            # 仅支持所有订单止损价一致的场景
+            # 取第一个订单的止损参数作为本次批量下单的统一止损
+            if sl_mode == "FIXED_POINTS":
+                tick = mt5.symbol_info_tick(symbol)
+                if not tick:
+                    self.gui_window.status_bar.showMessage(
+                        f"无法获取{symbol}当前价格！"
+                    )
                     return
+                batch_entry_price = tick.ask if order_type == "buy" else tick.bid
+                sl_points = checked_orders[0]["sl_points"]
+                point = mt5.symbol_info(symbol).point
+                if order_type == "buy":
+                    sl_price = batch_entry_price - sl_points * point
+                else:
+                    sl_price = batch_entry_price + sl_points * point
+            else:
+                countdown = self.gui_window.components.get("countdown")
+                if not countdown:
+                    self.gui_window.status_bar.showMessage("未找到倒计时组件！")
+                    return
+                timeframe = countdown.timeframe_combo.currentText()
+                lookback = checked_orders[0]["sl_candle"]
+                timeframe_mt5 = batch_order.get_timeframe(timeframe)
+                rates = mt5.copy_rates_from_pos(symbol, timeframe_mt5, 0, lookback + 2)
+                if rates is None or len(rates) < lookback + 2:
+                    self.gui_window.status_bar.showMessage(
+                        f"获取K线数据失败，需要至少{lookback + 2}根K线！"
+                    )
+                    return
+                lowest_point = min([rate["low"] for rate in rates[2:]])
+                highest_point = max([rate["high"] for rate in rates[2:]])
+                sl_offset = (
+                    BREAKOUT_SETTINGS["SL_OFFSET_POINTS"]
+                    * mt5.symbol_info(symbol).point
+                )
+                if order_type == "buy":
+                    sl_price = lowest_point - sl_offset
+                    batch_entry_price = mt5.symbol_info_tick(symbol).ask
+                else:
+                    sl_price = highest_point + sl_offset
+                    batch_entry_price = mt5.symbol_info_tick(symbol).bid
 
-                point = symbol_info.point
-                sl_offset = BREAKOUT_SETTINGS["SL_OFFSET_POINTS"] * point
-
+            if has_positions:
+                # 有持仓时用盈亏平衡手数
+                breakeven_volume = self.calculate_breakeven_position_size(
+                    symbol, order_type, sl_price, batch_entry_price, batch_count
+                )
+                if breakeven_volume <= 0:
+                    self.gui_window.status_bar.showMessage(
+                        "盈亏平衡手数计算失败，无法批量下单！"
+                    )
+                    return
+                for order in batch_order.orders:
+                    if order["checked"]:
+                        order["volume"] = breakeven_volume
             # 下所有勾选的订单
             orders = []
             for i, order in enumerate(batch_order.orders):
                 if not order["checked"]:
                     continue
-
-                # 检查仓位计算模式
                 position_sizing_mode = POSITION_SIZING["DEFAULT_MODE"]
                 volume = order["volume"]
-
-                # 如果是固定亏损模式，需要先获取当前价格来计算仓位
-                if position_sizing_mode == "FIXED_LOSS":
+                if not has_positions and position_sizing_mode == "FIXED_LOSS":
                     if order["fixed_loss"] <= 0:
                         print(f"订单{i+1}：固定亏损金额无效，跳过")
                         continue
-
-                    # 获取当前价格作为入场价参考
                     tick = mt5.symbol_info_tick(symbol)
                     if not tick:
                         print(f"订单{i+1}：无法获取当前价格，跳过")
                         continue
-
-                    # 根据订单类型选择入场价
                     entry_price = tick.ask if order_type == "buy" else tick.bid
-
-                    # 计算仓位大小
                     calculated_volume = batch_order.calculate_position_size_for_order(
                         i, order_type, entry_price, symbol
                     )
-
                     if calculated_volume <= 0:
                         print(f"订单{i+1}：仓位计算失败，跳过")
                         continue
-
                     volume = calculated_volume
                     print(
                         f"订单{i+1}：固定亏损{order['fixed_loss']}美元，计算手数{volume}"
                     )
-
                 elif volume <= 0:
                     print(f"订单{i+1}：手数无效，跳过")
                     continue
-
                 if sl_mode == "FIXED_POINTS":
                     mt5_order = self.trader.place_order_with_tp_sl(
                         symbol=symbol,
@@ -496,44 +538,67 @@ class TradingButtonsSection:
                 order_type = "sell_stop"  # 使用sell_stop而不是sell
                 comment_prefix = f"{timeframe}低点突破卖出"
 
+            # 判断当前是否有同方向持仓
+            order_direction = "buy" if breakout_type == "high" else "sell"
+            positions = self.trader.get_positions_by_symbol_and_type(
+                symbol, order_direction
+            )
+            has_positions = bool(positions)
+
             # 下所有勾选的订单
             orders = []
             order_details = []
+            batch_count = sum(1 for order in batch_order.orders if order["checked"])
+            if has_positions:
+                # 统一计算盈亏平衡手数
+                # 取第一个订单的止损参数作为统一止损
+                if sl_mode == "FIXED_POINTS":
+                    if breakout_type == "high":
+                        sl_price = (
+                            entry_price - batch_order.orders[0]["sl_points"] * point
+                        )
+                    else:
+                        sl_price = (
+                            entry_price + batch_order.orders[0]["sl_points"] * point
+                        )
+                else:
+                    if breakout_type == "high":
+                        sl_price = previous_low - sl_offset * point
+                    else:
+                        sl_price = previous_high + sl_offset * point
+                breakeven_volume = self.calculate_breakeven_position_size(
+                    symbol, order_direction, sl_price, entry_price, batch_count
+                )
+                if breakeven_volume <= 0:
+                    self.gui_window.status_bar.showMessage(
+                        "盈亏平衡手数计算失败，无法挂突破单！"
+                    )
+                    return
+                for order in batch_order.orders:
+                    if order["checked"]:
+                        order["volume"] = breakeven_volume
             for i, order in enumerate(batch_order.orders):
                 if not order["checked"]:
                     continue
-
-                # 检查仓位计算模式
                 position_sizing_mode = POSITION_SIZING["DEFAULT_MODE"]
                 volume = order["volume"]
-
-                # 如果是固定亏损模式，计算仓位大小
-                if position_sizing_mode == "FIXED_LOSS":
+                if not has_positions and position_sizing_mode == "FIXED_LOSS":
                     if order["fixed_loss"] <= 0:
                         print(f"突破订单{i+1}：固定亏损金额无效，跳过")
                         continue
-
-                    # 根据突破类型确定订单方向
-                    order_direction = "buy" if breakout_type == "high" else "sell"
-
-                    # 计算仓位大小
                     calculated_volume = batch_order.calculate_position_size_for_order(
                         i, order_direction, entry_price, symbol
                     )
-
                     if calculated_volume <= 0:
                         print(f"突破订单{i+1}：仓位计算失败，跳过")
                         continue
-
                     volume = calculated_volume
                     print(
                         f"突破订单{i+1}：固定亏损{order['fixed_loss']}美元，计算手数{volume}"
                     )
-
                 elif volume <= 0:
                     print(f"突破订单{i+1}：手数无效，跳过")
                     continue
-
                 sl_price = None
                 if sl_mode == "FIXED_POINTS":
                     if breakout_type == "high":
@@ -541,23 +606,10 @@ class TradingButtonsSection:
                     else:
                         sl_price = entry_price + order["sl_points"] * point
                 else:
-                    countdown = self.gui_window.components["countdown"]
-                    timeframe = countdown.timeframe_combo.currentText()
-                    lookback = order["sl_candle"]
-                    rates = mt5.copy_rates_from_pos(
-                        symbol, self.get_timeframe(timeframe), 0, lookback + 2
-                    )
-                    if rates is None or len(rates) < lookback + 2:
-                        self.gui_window.status_bar.showMessage(
-                            f"获取K线数据失败，需要至少{lookback + 2}根K线！"
-                        )
-                        return
-                    lowest_point = min([rate["low"] for rate in rates[2:]])
-                    highest_point = max([rate["high"] for rate in rates[2:]])
                     if breakout_type == "high":
-                        sl_price = lowest_point - sl_offset * point
+                        sl_price = previous_low - sl_offset * point
                     else:
-                        sl_price = highest_point + sl_offset * point
+                        sl_price = previous_high + sl_offset * point
                 mt5_order = self.trader.place_pending_order(
                     symbol=symbol,
                     order_type=order_type,
@@ -713,16 +765,27 @@ class TradingButtonsSection:
                 position_id = position.ticket
                 entry_price = position.price_open
                 point = mt5.symbol_info(position.symbol).point
+                current_sl = position.sl
 
                 # 根据订单类型和偏移点数计算止损价格
                 if position.type == mt5.POSITION_TYPE_BUY:
-                    # 买入订单，止损设置在入场价偏移offset_points个点
-                    # 如果偏移为正，则止损设在入场价下方；如果为负，则设在入场价上方
                     sl_price = entry_price - offset_points * point
+                    # 只允许止损上移（更高），不允许下移
+                    if (
+                        current_sl is not None
+                        and current_sl > 0
+                        and sl_price <= current_sl
+                    ):
+                        continue
                 else:
-                    # 卖出订单，止损设置在入场价偏移offset_points个点
-                    # 如果偏移为正，则止损设在入场价上方；如果为负，则设在入场价下方
                     sl_price = entry_price + offset_points * point
+                    # 只允许止损下移（更低），不允许上移
+                    if (
+                        current_sl is not None
+                        and current_sl > 0
+                        and sl_price >= current_sl
+                    ):
+                        continue
 
                 # 使用trader中的修改止损止盈方法
                 if self.trader.modify_position_sl_tp(position_id, sl=sl_price, tp=None):
@@ -874,3 +937,52 @@ class TradingButtonsSection:
         except Exception as e:
             self.gui_window.status_bar.showMessage(f"移动止损出错：{str(e)}")
             print(f"移动止损错误详情：{str(e)}")
+
+    def calculate_breakeven_position_size(
+        self, symbol, order_type, sl_price, batch_entry_price, batch_count
+    ):
+        """
+        计算批量加仓每单盈亏平衡手数
+
+        Args:
+            symbol: 交易品种
+            order_type: 'buy' 或 'sell'
+            sl_price: 新止损价
+            batch_entry_price: 本次批量下单的开仓价（市价或挂单价）
+            batch_count: 本次批量下单的单数
+
+        Returns:
+            建议每单手数，若无法计算则返回0
+        """
+        try:
+            # 获取所有同品种同方向持仓
+            positions = self.trader.get_positions_by_symbol_and_type(symbol, order_type)
+            if not positions:
+                return 0  # 无持仓时不做特殊处理
+            # 统计已有持仓总手数和加权平均开仓价
+            total_volume = sum(p["volume"] for p in positions)
+            if total_volume == 0:
+                return 0
+            avg_entry_price = (
+                sum(p["price_open"] * p["volume"] for p in positions) / total_volume
+            )
+            # 盈亏平衡公式
+            numerator = (sl_price - avg_entry_price) * total_volume
+            denominator = batch_count * (sl_price - batch_entry_price)
+            if denominator == 0:
+                return 0
+            v2 = -numerator / denominator
+            # 获取合约最小手数步进
+            symbol_info = mt5.symbol_info(symbol)
+            if not symbol_info:
+                return 0
+            min_volume = symbol_info.volume_min
+            max_volume = symbol_info.volume_max
+            volume_step = symbol_info.volume_step
+            # 调整到最接近的有效手数
+            v2 = max(min_volume, min(max_volume, v2))
+            v2 = round(v2 / volume_step) * volume_step
+            return v2
+        except Exception as e:
+            print(f"盈亏平衡手数计算出错: {str(e)}")
+            return 0

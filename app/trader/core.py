@@ -208,3 +208,30 @@ class MT5Trader:
     def get_all_symbols(self) -> List[str]:
         """获取所有可交易品种"""
         return get_all_symbols(self.connected)
+
+    def get_positions_by_symbol_and_type(
+        self, symbol: str, order_type: str
+    ) -> List[Dict]:
+        """
+        获取指定品种和方向的所有持仓
+
+        Args:
+            symbol: 交易品种
+            order_type: 订单方向（'buy' 或 'sell'）
+
+        Returns:
+            满足条件的持仓列表
+        """
+        if not self.connected:
+            return []
+        try:
+            positions = mt5.positions_get(symbol=symbol)
+            if positions is None:
+                return []
+            mt5_type = (
+                mt5.POSITION_TYPE_BUY if order_type == "buy" else mt5.POSITION_TYPE_SELL
+            )
+            return [p._asdict() for p in positions if p.type == mt5_type]
+        except Exception as e:
+            print(f"获取指定品种和方向持仓出错：{str(e)}")
+            return []
