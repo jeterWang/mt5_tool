@@ -43,6 +43,8 @@ from config.loader import (
     get_config_path,
 )
 from utils.paths import get_icon_path
+import config.loader as config_loader
+from app.config.config_manager import config_manager
 
 
 class SettingsDialog(QDialog):
@@ -97,7 +99,7 @@ class SettingsDialog(QDialog):
         )
 
         # 填充现有品种
-        for i, symbol in enumerate(SYMBOLS):
+        for i, symbol in enumerate(config_manager.get("SYMBOLS")):
             self.symbols_table.setItem(i, 0, QTableWidgetItem(symbol))
 
         symbols_layout.addWidget(self.symbols_table)
@@ -109,7 +111,7 @@ class SettingsDialog(QDialog):
         self.timeframe_combo.addItems(
             ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1", "MN1"]
         )
-        self.timeframe_combo.setCurrentText(DEFAULT_TIMEFRAME)
+        self.timeframe_combo.setCurrentText(config_manager.get("DEFAULT_TIMEFRAME"))
         timeframe_layout.addWidget(self.timeframe_combo)
 
         # 时区设置
@@ -117,7 +119,7 @@ class SettingsDialog(QDialog):
         timezone_layout.addWidget(QLabel("时区差值(小时):"))
         self.timezone_spin = QSpinBox()
         self.timezone_spin.setRange(-12, 12)
-        self.timezone_spin.setValue(Delta_TIMEZONE)
+        self.timezone_spin.setValue(config_manager.get("Delta_TIMEZONE"))
         timezone_layout.addWidget(self.timezone_spin)
 
         # 交易日重置时间
@@ -125,7 +127,7 @@ class SettingsDialog(QDialog):
         reset_layout.addWidget(QLabel("交易日重置时间(小时):"))
         self.reset_spin = QSpinBox()
         self.reset_spin.setRange(0, 23)
-        self.reset_spin.setValue(TRADING_DAY_RESET_HOUR)
+        self.reset_spin.setValue(config_manager.get("TRADING_DAY_RESET_HOUR"))
         reset_layout.addWidget(self.reset_spin)
 
         # 添加所有组件到布局
@@ -141,51 +143,45 @@ class SettingsDialog(QDialog):
         """创建GUI设置标签页"""
         gui_tab = QGroupBox("界面设置")
         layout = QVBoxLayout(gui_tab)
-
+        gui_settings = config_manager.get("GUI_SETTINGS")
         # 窗口置顶设置
         top_layout = QHBoxLayout()
         self.window_top_check = QCheckBox("窗口置顶")
-        self.window_top_check.setChecked(GUI_SETTINGS["WINDOW_TOP"])
+        self.window_top_check.setChecked(gui_settings["WINDOW_TOP"])
         top_layout.addWidget(self.window_top_check)
-
         # 声音提醒设置
         sound_layout = QHBoxLayout()
         self.sound_alert_check = QCheckBox("启用声音提醒")
-        self.sound_alert_check.setChecked(GUI_SETTINGS["SOUND_ALERT"])
+        self.sound_alert_check.setChecked(gui_settings["SOUND_ALERT"])
         sound_layout.addWidget(self.sound_alert_check)
-
         # 提前提醒秒数
         alert_layout = QHBoxLayout()
         alert_layout.addWidget(QLabel("提前提醒秒数:"))
         self.alert_seconds_spin = QSpinBox()
         self.alert_seconds_spin.setRange(1, 60)
-        self.alert_seconds_spin.setValue(GUI_SETTINGS["ALERT_SECONDS"])
+        self.alert_seconds_spin.setValue(gui_settings["ALERT_SECONDS"])
         alert_layout.addWidget(self.alert_seconds_spin)
-
         # 提示音设置
         beep_layout = QHBoxLayout()
         beep_layout.addWidget(QLabel("提示音频率(Hz):"))
         self.beep_freq_spin = QSpinBox()
         self.beep_freq_spin.setRange(100, 2000)
-        self.beep_freq_spin.setValue(GUI_SETTINGS["BEEP_FREQUENCY"])
+        self.beep_freq_spin.setValue(gui_settings["BEEP_FREQUENCY"])
         beep_layout.addWidget(self.beep_freq_spin)
-
         beep_layout.addWidget(QLabel("提示音持续时间(ms):"))
         self.beep_duration_spin = QSpinBox()
         self.beep_duration_spin.setRange(50, 2000)
-        self.beep_duration_spin.setValue(GUI_SETTINGS["BEEP_DURATION"])
+        self.beep_duration_spin.setValue(gui_settings["BEEP_DURATION"])
         beep_layout.addWidget(self.beep_duration_spin)
-
         # 一键保本偏移点数设置
         breakeven_layout = QHBoxLayout()
         breakeven_layout.addWidget(QLabel("一键保本偏移点数:"))
         self.breakeven_offset_spin = QSpinBox()
         self.breakeven_offset_spin.setRange(-1000, 1000)
         self.breakeven_offset_spin.setValue(
-            GUI_SETTINGS.get("BREAKEVEN_OFFSET_POINTS", 0)
+            gui_settings.get("BREAKEVEN_OFFSET_POINTS", 0)
         )
         breakeven_layout.addWidget(self.breakeven_offset_spin)
-
         # 添加所有组件到布局
         layout.addLayout(top_layout)
         layout.addLayout(sound_layout)
@@ -193,7 +189,6 @@ class SettingsDialog(QDialog):
         layout.addLayout(beep_layout)
         layout.addLayout(breakeven_layout)
         layout.addStretch()
-
         # 添加到标签页
         self.tab_widget.addTab(gui_tab, "界面设置")
 
@@ -201,92 +196,64 @@ class SettingsDialog(QDialog):
         """创建交易设置标签页"""
         trading_tab = QGroupBox("交易设置")
         layout = QVBoxLayout(trading_tab)
-
-        # 风控设置组
+        # 风控设置
         risk_group = QGroupBox("风控设置")
-        risk_layout = QVBoxLayout(risk_group)
-
-        # 日亏损限额
-        loss_layout = QHBoxLayout()
-        loss_layout.addWidget(QLabel("日亏损限额:"))
+        risk_layout = QHBoxLayout(risk_group)
         self.loss_limit_spin = QDoubleSpinBox()
-        self.loss_limit_spin.setRange(0, 10000)
-        self.loss_limit_spin.setValue(DAILY_LOSS_LIMIT)
-        loss_layout.addWidget(self.loss_limit_spin)
-
-        # 日交易次数限制
-        trade_layout = QHBoxLayout()
-        trade_layout.addWidget(QLabel("日交易次数限制:"))
+        self.loss_limit_spin.setRange(0, 100000)
+        self.loss_limit_spin.setValue(config_manager.get("DAILY_LOSS_LIMIT"))
+        risk_layout.addWidget(QLabel("每日最大亏损:"))
+        risk_layout.addWidget(self.loss_limit_spin)
         self.trade_limit_spin = QSpinBox()
         self.trade_limit_spin.setRange(0, 1000)
-        self.trade_limit_spin.setValue(DAILY_TRADE_LIMIT)
-        trade_layout.addWidget(self.trade_limit_spin)
-
-        risk_layout.addLayout(loss_layout)
-        risk_layout.addLayout(trade_layout)
-
-        # 止损设置
-        sl_group = QGroupBox("止损设置")
-        sl_layout = QVBoxLayout(sl_group)
-
-        # 默认止损模式
-        sl_mode_layout = QHBoxLayout()
-        sl_mode_layout.addWidget(QLabel("默认止损模式:"))
+        self.trade_limit_spin.setValue(config_manager.get("DAILY_TRADE_LIMIT"))
+        risk_layout.addWidget(QLabel("每日最大交易次数:"))
+        risk_layout.addWidget(self.trade_limit_spin)
+        # 止损模式
+        sl_group = QGroupBox("止损模式")
+        sl_layout = QHBoxLayout(sl_group)
+        sl_mode = config_manager.get("SL_MODE")
         self.sl_mode_combo = QComboBox()
-        self.sl_mode_combo.addItems(["固定点数止损", "K线关键位止损"])
+        self.sl_mode_combo.addItems(["固定点数", "关键K线"])
         self.sl_mode_combo.setCurrentIndex(
-            0 if SL_MODE["DEFAULT_MODE"] == "FIXED_POINTS" else 1
+            0 if sl_mode["DEFAULT_MODE"] == "FIXED_POINTS" else 1
         )
-        sl_mode_layout.addWidget(self.sl_mode_combo)
-
-        # K线回溯数量
-        candle_layout = QHBoxLayout()
-        candle_layout.addWidget(QLabel("K线回溯数量:"))
+        sl_layout.addWidget(QLabel("默认止损模式:"))
+        sl_layout.addWidget(self.sl_mode_combo)
         self.candle_lookback_spin = QSpinBox()
         self.candle_lookback_spin.setRange(1, 20)
-        self.candle_lookback_spin.setValue(SL_MODE["CANDLE_LOOKBACK"])
-        candle_layout.addWidget(self.candle_lookback_spin)
-
-        sl_layout.addLayout(sl_mode_layout)
-        sl_layout.addLayout(candle_layout)
-
+        self.candle_lookback_spin.setValue(sl_mode["CANDLE_LOOKBACK"])
+        sl_layout.addWidget(QLabel("K线回溯数:"))
+        sl_layout.addWidget(self.candle_lookback_spin)
         # 突破设置
         breakout_group = QGroupBox("突破设置")
         breakout_layout = QVBoxLayout(breakout_group)
-
-        # 高点突破偏移点数
+        breakout_settings = config_manager.get("BREAKOUT_SETTINGS")
         high_layout = QHBoxLayout()
         high_layout.addWidget(QLabel("高点突破偏移点数:"))
         self.high_offset_spin = QSpinBox()
-        self.high_offset_spin.setRange(0, 1000)
-        self.high_offset_spin.setValue(BREAKOUT_SETTINGS["HIGH_OFFSET_POINTS"])
+        self.high_offset_spin.setRange(0, 10000)
+        self.high_offset_spin.setValue(breakout_settings["HIGH_OFFSET_POINTS"])
         high_layout.addWidget(self.high_offset_spin)
-
-        # 低点突破偏移点数
         low_layout = QHBoxLayout()
         low_layout.addWidget(QLabel("低点突破偏移点数:"))
         self.low_offset_spin = QSpinBox()
-        self.low_offset_spin.setRange(0, 1000)
-        self.low_offset_spin.setValue(BREAKOUT_SETTINGS["LOW_OFFSET_POINTS"])
+        self.low_offset_spin.setRange(0, 10000)
+        self.low_offset_spin.setValue(breakout_settings["LOW_OFFSET_POINTS"])
         low_layout.addWidget(self.low_offset_spin)
-
-        # 止损偏移点数
         sl_offset_layout = QHBoxLayout()
         sl_offset_layout.addWidget(QLabel("止损偏移点数:"))
         self.sl_offset_spin = QSpinBox()
         self.sl_offset_spin.setRange(0, 10000)
-        self.sl_offset_spin.setValue(BREAKOUT_SETTINGS["SL_OFFSET_POINTS"])
+        self.sl_offset_spin.setValue(breakout_settings["SL_OFFSET_POINTS"])
         sl_offset_layout.addWidget(self.sl_offset_spin)
-
         breakout_layout.addLayout(high_layout)
         breakout_layout.addLayout(low_layout)
         breakout_layout.addLayout(sl_offset_layout)
-
         # 添加所有组件到布局
         layout.addWidget(risk_group)
         layout.addWidget(sl_group)
         layout.addWidget(breakout_group)
-
         # 添加到标签页
         self.tab_widget.addTab(trading_tab, "交易设置")
 
@@ -294,8 +261,7 @@ class SettingsDialog(QDialog):
         """创建批量下单设置标签页"""
         batch_tab = QGroupBox("批量下单设置")
         layout = QVBoxLayout(batch_tab)
-
-        # 创建表格
+        batch_defaults = config_manager.get("BATCH_ORDER_DEFAULTS")
         self.batch_table = QTableWidget(4, 5)  # 增加为5列，添加sl_candle列
         self.batch_table.setHorizontalHeaderLabels(
             ["订单", "手数", "止损点数", "止盈点数", "K线回溯数"]
@@ -303,44 +269,29 @@ class SettingsDialog(QDialog):
         self.batch_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
         )
-
         # 填充现有设置
         for i in range(4):
             order_key = f"order{i+1}"
-            order_data = BATCH_ORDER_DEFAULTS[order_key]
-
-            # 订单编号
+            order_data = batch_defaults[order_key]
             self.batch_table.setItem(i, 0, QTableWidgetItem(f"第{i+1}单"))
-
-            # 创建SpinBox用于手数
             volume_spin = QDoubleSpinBox()
             volume_spin.setRange(0.01, 100)
             volume_spin.setSingleStep(0.01)
             volume_spin.setValue(order_data["volume"])
             self.batch_table.setCellWidget(i, 1, volume_spin)
-
-            # 创建SpinBox用于止损点数
             sl_spin = QSpinBox()
             sl_spin.setRange(0, 100000)
             sl_spin.setValue(order_data["sl_points"])
             self.batch_table.setCellWidget(i, 2, sl_spin)
-
-            # 创建SpinBox用于止盈点数
             tp_spin = QSpinBox()
             tp_spin.setRange(0, 100000)
             tp_spin.setValue(order_data["tp_points"])
             self.batch_table.setCellWidget(i, 3, tp_spin)
-
-            # 创建SpinBox用于K线回溯数
             sl_candle_spin = QSpinBox()
             sl_candle_spin.setRange(1, 20)
-            sl_candle_spin.setValue(
-                order_data.get("sl_candle", SL_MODE["CANDLE_LOOKBACK"])
-            )  # 使用sl_candle或默认值
+            sl_candle_spin.setValue(order_data.get("sl_candle", 3))
             self.batch_table.setCellWidget(i, 4, sl_candle_spin)
-
         layout.addWidget(self.batch_table)
-
         # 添加到标签页
         self.tab_widget.addTab(batch_tab, "批量下单")
 
@@ -391,71 +342,60 @@ class SettingsDialog(QDialog):
         """保存所有设置到配置文件"""
         try:
             # 1. 基本设置
-            # 收集交易品种
             symbols = []
             for i in range(self.symbols_table.rowCount()):
                 item = self.symbols_table.item(i, 0)
                 if item and item.text().strip():
                     symbols.append(item.text().strip())
-
-            # 保存前先清空当前SYMBOLS，确保删除的品种不会保留
-            SYMBOLS.clear()
-            # 使用extend而不是赋值，确保引用不变
-            SYMBOLS.extend(symbols)
-
-            # 默认时间周期
-            DEFAULT_TIMEFRAME = self.timeframe_combo.currentText()
-
-            # 时区差值
-            Delta_TIMEZONE = self.timezone_spin.value()
-
-            # 交易日重置时间
-            TRADING_DAY_RESET_HOUR = self.reset_spin.value()
-
+            config_manager.set("SYMBOLS", symbols)
+            config_manager.set("DEFAULT_TIMEFRAME", self.timeframe_combo.currentText())
+            config_manager.set("Delta_TIMEZONE", self.timezone_spin.value())
+            config_manager.set("TRADING_DAY_RESET_HOUR", self.reset_spin.value())
             # 2. GUI设置
-            GUI_SETTINGS["WINDOW_TOP"] = self.window_top_check.isChecked()
-            GUI_SETTINGS["SOUND_ALERT"] = self.sound_alert_check.isChecked()
-            GUI_SETTINGS["ALERT_SECONDS"] = self.alert_seconds_spin.value()
-            GUI_SETTINGS["BEEP_FREQUENCY"] = self.beep_freq_spin.value()
-            GUI_SETTINGS["BEEP_DURATION"] = self.beep_duration_spin.value()
-            GUI_SETTINGS["BREAKEVEN_OFFSET_POINTS"] = self.breakeven_offset_spin.value()
-
+            gui_settings = config_manager.get("GUI_SETTINGS")
+            gui_settings["WINDOW_TOP"] = self.window_top_check.isChecked()
+            gui_settings["SOUND_ALERT"] = self.sound_alert_check.isChecked()
+            gui_settings["ALERT_SECONDS"] = self.alert_seconds_spin.value()
+            gui_settings["BEEP_FREQUENCY"] = self.beep_freq_spin.value()
+            gui_settings["BEEP_DURATION"] = self.beep_duration_spin.value()
+            gui_settings["BREAKEVEN_OFFSET_POINTS"] = self.breakeven_offset_spin.value()
+            config_manager.set("GUI_SETTINGS", gui_settings)
             # 3. 交易设置
-            # 止损模式
-            SL_MODE["DEFAULT_MODE"] = (
+            sl_mode = config_manager.get("SL_MODE")
+            sl_mode["DEFAULT_MODE"] = (
                 "FIXED_POINTS"
                 if self.sl_mode_combo.currentIndex() == 0
                 else "CANDLE_KEY_LEVEL"
             )
-            SL_MODE["CANDLE_LOOKBACK"] = self.candle_lookback_spin.value()
-
-            # 突破设置
-            BREAKOUT_SETTINGS["HIGH_OFFSET_POINTS"] = self.high_offset_spin.value()
-            BREAKOUT_SETTINGS["LOW_OFFSET_POINTS"] = self.low_offset_spin.value()
-            BREAKOUT_SETTINGS["SL_OFFSET_POINTS"] = self.sl_offset_spin.value()
-
+            sl_mode["CANDLE_LOOKBACK"] = self.candle_lookback_spin.value()
+            config_manager.set("SL_MODE", sl_mode)
+            breakout_settings = config_manager.get("BREAKOUT_SETTINGS")
+            breakout_settings["HIGH_OFFSET_POINTS"] = self.high_offset_spin.value()
+            breakout_settings["LOW_OFFSET_POINTS"] = self.low_offset_spin.value()
+            breakout_settings["SL_OFFSET_POINTS"] = self.sl_offset_spin.value()
+            config_manager.set("BREAKOUT_SETTINGS", breakout_settings)
             # 4. 风控设置
-            DAILY_LOSS_LIMIT = self.loss_limit_spin.value()
-            DAILY_TRADE_LIMIT = self.trade_limit_spin.value()
-
+            config_manager.set("DAILY_LOSS_LIMIT", self.loss_limit_spin.value())
+            config_manager.set("DAILY_TRADE_LIMIT", self.trade_limit_spin.value())
             # 5. 批量下单设置
+            batch_defaults = config_manager.get("BATCH_ORDER_DEFAULTS")
             for i in range(4):
                 order_key = f"order{i+1}"
                 volume_spin = self.batch_table.cellWidget(i, 1)
                 sl_spin = self.batch_table.cellWidget(i, 2)
                 tp_spin = self.batch_table.cellWidget(i, 3)
                 sl_candle_spin = self.batch_table.cellWidget(i, 4)
-
-                BATCH_ORDER_DEFAULTS[order_key] = {
+                batch_defaults[order_key] = {
                     "volume": volume_spin.value(),
                     "sl_points": sl_spin.value(),
                     "tp_points": tp_spin.value(),
                     "sl_candle": sl_candle_spin.value(),
+                    "fixed_loss": batch_defaults[order_key].get("fixed_loss", 5.0),
+                    "checked": batch_defaults[order_key].get("checked", True),
                 }
-
+            config_manager.set("BATCH_ORDER_DEFAULTS", batch_defaults)
             # 保存到文件
-            success = save_config()
-
+            success = config_manager.save()
             if success:
                 QMessageBox.information(self, "保存成功", "设置已成功保存")
                 self.accept()

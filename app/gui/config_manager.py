@@ -4,12 +4,7 @@
 负责保存和加载GUI配置
 """
 
-from config.loader import (
-    GUI_SETTINGS,
-    BATCH_ORDER_DEFAULTS,
-    SL_MODE,
-    save_config,
-)
+from app.config.config_manager import config_manager
 
 
 def save_gui_config(gui_window):
@@ -27,31 +22,33 @@ def save_gui_config(gui_window):
 
         # 更新声音提醒设置
         countdown = gui_window.components["countdown"]
-        GUI_SETTINGS["SOUND_ALERT"] = countdown.sound_checkbox.isChecked()
-        GUI_SETTINGS["WINDOW_TOP"] = countdown.topmost_checkbox.isChecked()
+        gui_settings = config_manager.get("GUI_SETTINGS")
+        gui_settings["SOUND_ALERT"] = countdown.sound_checkbox.isChecked()
+        gui_settings["WINDOW_TOP"] = countdown.topmost_checkbox.isChecked()
+        config_manager.set("GUI_SETTINGS", gui_settings)
 
         # 保存一键保本偏移点数设置
-        if "BREAKEVEN_OFFSET_POINTS" in GUI_SETTINGS:
-            # print(
-            # f"当前一键保本偏移点数设置为: {GUI_SETTINGS['BREAKEVEN_OFFSET_POINTS']}"
-            # )
+        # （如有其它相关设置可在此补充）
 
         # 更新止损模式设置
         trading_settings = gui_window.components["trading_settings"]
-        SL_MODE["DEFAULT_MODE"] = (
+        sl_mode = config_manager.get("SL_MODE")
+        sl_mode["DEFAULT_MODE"] = (
             "FIXED_POINTS"
             if trading_settings.sl_mode_combo.currentIndex() == 0
             else "CANDLE_KEY_LEVEL"
         )
+        config_manager.set("SL_MODE", sl_mode)
 
         # 打印保存前的批量下单设置
         # print(f"保存前BATCH_ORDER_DEFAULTS: {BATCH_ORDER_DEFAULTS}")
 
         # 更新批量下单默认值
         batch_order = gui_window.components["batch_order"]
+        batch_defaults = config_manager.get("BATCH_ORDER_DEFAULTS")
         for i, order in enumerate(batch_order.orders):
             order_key = f"order{i+1}"
-            BATCH_ORDER_DEFAULTS[order_key] = {
+            batch_defaults[order_key] = {
                 "volume": order["volume"],
                 "sl_points": order["sl_points"],
                 "tp_points": order["tp_points"],
@@ -61,15 +58,16 @@ def save_gui_config(gui_window):
             }
 
         # 更新K线关键位止损默认K线回溯数量
-        if SL_MODE["DEFAULT_MODE"] == "CANDLE_KEY_LEVEL" and batch_order.orders:
-            SL_MODE["CANDLE_LOOKBACK"] = batch_order.orders[0]["sl_candle"]
+        if sl_mode["DEFAULT_MODE"] == "CANDLE_KEY_LEVEL" and batch_order.orders:
+            sl_mode["CANDLE_LOOKBACK"] = batch_order.orders[0]["sl_candle"]
+            config_manager.set("SL_MODE", sl_mode)
             # print(f"设置K线回溯数量: {SL_MODE['CANDLE_LOOKBACK']}")
 
         # 打印保存后的批量下单设置
         # print(f"保存后BATCH_ORDER_DEFAULTS: {BATCH_ORDER_DEFAULTS}")
 
         # 保存配置
-        result = save_config()
+        result = config_manager.save()
         # print(f"配置保存结果: {result}")
 
         # 更新交易次数显示，确保UI显示是最新的

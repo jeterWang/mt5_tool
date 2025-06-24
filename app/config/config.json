@@ -8,7 +8,7 @@
     "Delta_TIMEZONE": 0,
     "TRADING_DAY_RESET_HOUR": 20,
     "DAILY_LOSS_LIMIT": 150.0,
-    "DAILY_TRADE_LIMIT": 10,
+    "DAILY_TRADE_LIMIT": 40,
     "GUI_SETTINGS": {
         "WINDOW_TOP": true,
         "SOUND_ALERT": true,
@@ -57,7 +57,7 @@
             "tp_points": 50000,
             "sl_candle": 3,
             "fixed_loss": 5.0,
-            "checked": true
+            "checked": false
         }
     },
     "POSITION_SIZING": {

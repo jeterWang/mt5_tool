@@ -29,8 +29,6 @@ from utils.paths import get_icon_path, get_font_path
 from app.trader import MT5Trader
 from app.database import TradeDatabase
 from config.loader import (
-    GUI_SETTINGS,
-    SL_MODE,
     SYMBOLS,
     load_config,
     DAILY_TRADE_LIMIT,
@@ -44,6 +42,7 @@ from app.gui.batch_order import BatchOrderSection
 from app.gui.trading_buttons import TradingButtonsSection
 from app.gui.positions_table import PositionsTableSection
 from app.gui.settings import show_settings_dialog
+from app.config.config_manager import config_manager
 
 
 # 全局引用，供其他模块使用
@@ -132,7 +131,7 @@ class MT5GUI(QMainWindow):
         self.setWindowIcon(QIcon(get_icon_path("icon.svg")))
 
         # 应用初始窗口置顶状态
-        if GUI_SETTINGS["WINDOW_TOP"]:
+        if config_manager.get("GUI_SETTINGS")["WINDOW_TOP"]:
             self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
             self.show()
 
@@ -484,7 +483,7 @@ class MT5GUI(QMainWindow):
     def update_ui_from_settings(self):
         """从配置更新UI显示"""
         # 更新窗口置顶状态
-        if GUI_SETTINGS["WINDOW_TOP"]:
+        if config_manager.get("GUI_SETTINGS")["WINDOW_TOP"]:
             if not (self.windowFlags() & Qt.WindowType.WindowStaysOnTopHint):
                 self.setWindowFlags(
                     self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint
@@ -498,25 +497,31 @@ class MT5GUI(QMainWindow):
                 self.show()
 
         # 更新复选框状态
-        self.topmost_checkbox.setChecked(GUI_SETTINGS["WINDOW_TOP"])
+        self.topmost_checkbox.setChecked(
+            config_manager.get("GUI_SETTINGS")["WINDOW_TOP"]
+        )
         self.components["countdown"].sound_checkbox.setChecked(
-            GUI_SETTINGS["SOUND_ALERT"]
+            config_manager.get("GUI_SETTINGS")["SOUND_ALERT"]
         )
 
         # 更新交易设置
         trading_settings = self.components["trading_settings"]
         trading_settings.sl_mode_combo.setCurrentIndex(
-            0 if SL_MODE["DEFAULT_MODE"] == "FIXED_POINTS" else 1
+            0 if config_manager.get("SL_MODE")["DEFAULT_MODE"] == "FIXED_POINTS" else 1
         )
         trading_settings.position_sizing_combo.setCurrentIndex(
-            0 if POSITION_SIZING["DEFAULT_MODE"] == "MANUAL" else 1
+            0
+            if config_manager.get("POSITION_SIZING")["DEFAULT_MODE"] == "MANUAL"
+            else 1
         )
 
         # 更新批量下单设置
         from app.gui.batch_order import update_sl_mode, update_position_sizing_mode
 
-        update_sl_mode(SL_MODE["DEFAULT_MODE"])
-        update_position_sizing_mode(POSITION_SIZING["DEFAULT_MODE"])
+        update_sl_mode(config_manager.get("SL_MODE")["DEFAULT_MODE"])
+        update_position_sizing_mode(
+            config_manager.get("POSITION_SIZING")["DEFAULT_MODE"]
+        )
 
         # 重新加载交易限制设置
         self.update_trading_limits()
@@ -556,8 +561,9 @@ class MT5GUI(QMainWindow):
 
         # 检查是否真的更新了
         if "file_limit" in locals() and file_limit != updated_limit:
-            logger.warning("[空日志]", 
-                f"警告: 文件中的值({file_limit})与更新后内存中的值({updated_limit})不一致!"
+            logger.warning(
+                "[空日志]",
+                f"警告: 文件中的值({file_limit})与更新后内存中的值({updated_limit})不一致!",
             )
 
         # 立即更新界面显示

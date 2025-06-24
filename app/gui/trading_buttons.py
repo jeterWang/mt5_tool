@@ -11,13 +11,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from config.loader import (
-    GUI_SETTINGS,
-    BATCH_ORDER_DEFAULTS,
-    SL_MODE,
-    BREAKOUT_SETTINGS,
-    POSITION_SIZING,
-)
+from app.config.config_manager import config_manager
 from app.gui.risk_control import check_trade_limit
 
 
@@ -361,7 +355,9 @@ class TradingButtonsSection:
                 lowest_point = min([rate["low"] for rate in rates[2:]])
                 highest_point = max([rate["high"] for rate in rates[2:]])
                 sl_offset = (
-                    BREAKOUT_SETTINGS["SL_OFFSET_POINTS"]
+                    config_manager.get("BREAKEVEN_SETTINGS", {}).get(
+                        "SL_OFFSET_POINTS", 0
+                    )
                     * mt5.symbol_info(symbol).point
                 )
                 if order_type == "buy":
@@ -389,7 +385,9 @@ class TradingButtonsSection:
             for i, order in enumerate(batch_order.orders):
                 if not order["checked"]:
                     continue
-                position_sizing_mode = POSITION_SIZING["DEFAULT_MODE"]
+                position_sizing_mode = config_manager.get("POSITION_SIZING", {}).get(
+                    "DEFAULT_MODE", "FIXED_LOSS"
+                )
                 volume = order["volume"]
                 if not has_positions and position_sizing_mode == "FIXED_LOSS":
                     if order["fixed_loss"] <= 0:
@@ -454,7 +452,10 @@ class TradingButtonsSection:
             if orders:
                 # 更新默认K线回溯数量
                 if sl_mode == "CANDLE_KEY_LEVEL" and batch_order.orders:
-                    SL_MODE["CANDLE_LOOKBACK"] = batch_order.orders[0]["sl_candle"]
+                    config_manager.set(
+                        "SL_MODE",
+                        {"CANDLE_LOOKBACK": batch_order.orders[0]["sl_candle"]},
+                    )
                     # 保存配置
                     trading_settings.on_sl_mode_changed(
                         trading_settings.sl_mode_combo.currentIndex()
@@ -472,7 +473,8 @@ class TradingButtonsSection:
                 )
                 # 播放提示音
                 winsound.Beep(
-                    GUI_SETTINGS["BEEP_FREQUENCY"], GUI_SETTINGS["BEEP_DURATION"]
+                    config_manager.get("BEEP_SETTINGS", {}).get("FREQUENCY", 0),
+                    config_manager.get("BEEP_SETTINGS", {}).get("DURATION", 0),
                 )
             else:
                 self.gui_window.status_bar.showMessage(f"批量{order_type}单失败！")
@@ -530,9 +532,15 @@ class TradingButtonsSection:
             previous_low = rates[1]["low"]
 
             # 从配置文件获取偏移量设置
-            high_offset = BREAKOUT_SETTINGS["HIGH_OFFSET_POINTS"]
-            low_offset = BREAKOUT_SETTINGS["LOW_OFFSET_POINTS"]
-            sl_offset = BREAKOUT_SETTINGS["SL_OFFSET_POINTS"]
+            high_offset = config_manager.get("BREAKEVEN_SETTINGS", {}).get(
+                "HIGH_OFFSET_POINTS", 0
+            )
+            low_offset = config_manager.get("BREAKEVEN_SETTINGS", {}).get(
+                "LOW_OFFSET_POINTS", 0
+            )
+            sl_offset = config_manager.get("BREAKEVEN_SETTINGS", {}).get(
+                "SL_OFFSET_POINTS", 0
+            )
 
             # 检查止损模式
             sl_mode = (
@@ -601,7 +609,9 @@ class TradingButtonsSection:
             for i, order in enumerate(batch_order.orders):
                 if not order["checked"]:
                     continue
-                position_sizing_mode = POSITION_SIZING["DEFAULT_MODE"]
+                position_sizing_mode = config_manager.get("POSITION_SIZING", {}).get(
+                    "DEFAULT_MODE", "FIXED_LOSS"
+                )
                 volume = order["volume"]
                 if not has_positions and position_sizing_mode == "FIXED_LOSS":
                     if order["fixed_loss"] <= 0:
@@ -649,7 +659,10 @@ class TradingButtonsSection:
             if orders:
                 # 更新默认K线回溯数量
                 if sl_mode == "CANDLE_KEY_LEVEL" and batch_order.orders:
-                    SL_MODE["CANDLE_LOOKBACK"] = batch_order.orders[0]["sl_candle"]
+                    config_manager.set(
+                        "SL_MODE",
+                        {"CANDLE_LOOKBACK": batch_order.orders[0]["sl_candle"]},
+                    )
                     # 保存配置
                     trading_settings.on_sl_mode_changed(
                         trading_settings.sl_mode_combo.currentIndex()
@@ -666,7 +679,8 @@ class TradingButtonsSection:
 
                 # 播放提示音
                 winsound.Beep(
-                    GUI_SETTINGS["BEEP_FREQUENCY"], GUI_SETTINGS["BEEP_DURATION"]
+                    config_manager.get("BEEP_SETTINGS", {}).get("FREQUENCY", 0),
+                    config_manager.get("BEEP_SETTINGS", {}).get("DURATION", 0),
                 )
             else:
                 self.gui_window.status_bar.showMessage(f"{comment_prefix}失败！")
@@ -773,7 +787,9 @@ class TradingButtonsSection:
                 return
 
             # 获取保本偏移点数
-            offset_points = GUI_SETTINGS.get("BREAKEVEN_OFFSET_POINTS", 0)
+            offset_points = config_manager.get("BREAKEVEN_SETTINGS", {}).get(
+                "OFFSET_POINTS", 0
+            )
 
             # 统计成功和失败的订单
             success_count = 0
@@ -831,7 +847,8 @@ class TradingButtonsSection:
                 self.gui_window.status_bar.showMessage(message)
                 # 播放提示音
                 winsound.Beep(
-                    GUI_SETTINGS["BEEP_FREQUENCY"], GUI_SETTINGS["BEEP_DURATION"]
+                    config_manager.get("BEEP_SETTINGS", {}).get("FREQUENCY", 0),
+                    config_manager.get("BEEP_SETTINGS", {}).get("DURATION", 0),
                 )
 
             if failed_positions:
@@ -947,7 +964,8 @@ class TradingButtonsSection:
                 self.gui_window.status_bar.showMessage(message)
                 # 播放提示音
                 winsound.Beep(
-                    GUI_SETTINGS["BEEP_FREQUENCY"], GUI_SETTINGS["BEEP_DURATION"]
+                    config_manager.get("BEEP_SETTINGS", {}).get("FREQUENCY", 0),
+                    config_manager.get("BEEP_SETTINGS", {}).get("DURATION", 0),
                 )
             else:
                 self.gui_window.status_bar.showMessage("所有持仓止损移动失败！")
