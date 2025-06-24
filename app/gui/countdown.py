@@ -123,10 +123,13 @@ class CountdownSection:
                 current_timestamp = current_time.timestamp()
                 # 确保提示音间隔至少1秒
                 if current_timestamp - last_beep_time >= 1:
-                    winsound.Beep(
-                        GUI_SETTINGS["BEEP_FREQUENCY"],
-                        GUI_SETTINGS["BEEP_DURATION"],
-                    )
+                    freq = GUI_SETTINGS["BEEP_FREQUENCY"]
+                    dur = GUI_SETTINGS["BEEP_DURATION"]
+                    if not (37 <= freq <= 32767):
+                        freq = 1000
+                    if not (10 <= dur <= 10000):
+                        dur = 200
+                    winsound.Beep(freq, dur)
                     # 更新最近一次提示音时间
                     return current_timestamp
 

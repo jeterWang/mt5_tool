@@ -33,7 +33,7 @@ class TradingSettingsSection:
         # 添加止损模式选择
         self.sl_mode_combo = QComboBox()
         self.sl_mode_combo.addItems(["固定点数止损", "K线关键位止损"])
-        if SL_MODE["DEFAULT_MODE"] == "FIXED_POINTS":
+        if SL_MODE.get("DEFAULT_MODE", "FIXED_POINTS") == "FIXED_POINTS":
             self.sl_mode_combo.setCurrentIndex(0)
         else:
             self.sl_mode_combo.setCurrentIndex(1)
@@ -99,7 +99,7 @@ class TradingSettingsSection:
         # 通知批量下单设置更新UI
         from app.gui.batch_order import update_sl_mode
 
-        return SL_MODE["DEFAULT_MODE"]
+        return SL_MODE.get("DEFAULT_MODE", "FIXED_POINTS")
 
     def on_position_sizing_changed(self, index):
         """

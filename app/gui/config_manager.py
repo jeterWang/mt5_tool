@@ -27,6 +27,16 @@ def save_gui_config(gui_window):
         gui_settings["WINDOW_TOP"] = countdown.topmost_checkbox.isChecked()
         config_manager.set("GUI_SETTINGS", gui_settings)
 
+        # 自动修正声音提醒频率和时长，防止非法值
+        if "BEEP_FREQUENCY" in gui_settings:
+            freq = gui_settings["BEEP_FREQUENCY"]
+            if not (37 <= freq <= 32767):
+                gui_settings["BEEP_FREQUENCY"] = 1000
+        if "BEEP_DURATION" in gui_settings:
+            dur = gui_settings["BEEP_DURATION"]
+            if not (10 <= dur <= 10000):
+                gui_settings["BEEP_DURATION"] = 200
+
         # 保存一键保本偏移点数设置
         # （如有其它相关设置可在此补充）
 
@@ -38,6 +48,9 @@ def save_gui_config(gui_window):
             if trading_settings.sl_mode_combo.currentIndex() == 0
             else "CANDLE_KEY_LEVEL"
         )
+        # 防御：如果sl_mode缺少DEFAULT_MODE，自动补全
+        if "DEFAULT_MODE" not in sl_mode:
+            sl_mode["DEFAULT_MODE"] = "FIXED_POINTS"
         config_manager.set("SL_MODE", sl_mode)
 
         # 打印保存前的批量下单设置
@@ -58,7 +71,10 @@ def save_gui_config(gui_window):
             }
 
         # 更新K线关键位止损默认K线回溯数量
-        if sl_mode["DEFAULT_MODE"] == "CANDLE_KEY_LEVEL" and batch_order.orders:
+        if (
+            sl_mode.get("DEFAULT_MODE", "FIXED_POINTS") == "CANDLE_KEY_LEVEL"
+            and batch_order.orders
+        ):
             sl_mode["CANDLE_LOOKBACK"] = batch_order.orders[0]["sl_candle"]
             config_manager.set("SL_MODE", sl_mode)
             # print(f"设置K线回溯数量: {SL_MODE['CANDLE_LOOKBACK']}")

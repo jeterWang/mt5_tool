@@ -507,7 +507,10 @@ class MT5GUI(QMainWindow):
         # 更新交易设置
         trading_settings = self.components["trading_settings"]
         trading_settings.sl_mode_combo.setCurrentIndex(
-            0 if config_manager.get("SL_MODE")["DEFAULT_MODE"] == "FIXED_POINTS" else 1
+            0
+            if config_manager.get("SL_MODE").get("DEFAULT_MODE", "FIXED_POINTS")
+            == "FIXED_POINTS"
+            else 1
         )
         trading_settings.position_sizing_combo.setCurrentIndex(
             0
@@ -518,7 +521,9 @@ class MT5GUI(QMainWindow):
         # 更新批量下单设置
         from app.gui.batch_order import update_sl_mode, update_position_sizing_mode
 
-        update_sl_mode(config_manager.get("SL_MODE")["DEFAULT_MODE"])
+        update_sl_mode(
+            config_manager.get("SL_MODE").get("DEFAULT_MODE", "FIXED_POINTS")
+        )
         update_position_sizing_mode(
             config_manager.get("POSITION_SIZING")["DEFAULT_MODE"]
         )

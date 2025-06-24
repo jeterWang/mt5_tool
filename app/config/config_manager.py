@@ -100,8 +100,10 @@ class ConfigManager:
         self._load()
 
     def _default_config_path(self):
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        return os.path.join(current_dir, "config.json")
+        project_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
+        return os.path.join(project_root, "config", "config.json")
 
     def register(self, key, default, typ):
         self._defaults[key] = default

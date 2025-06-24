@@ -268,6 +268,11 @@ class TradingButtonsSection:
         Args:
             order_type: 订单类型，'buy' 或 'sell'
         """
+        # 下单前风控检测
+        if not self.gui_window.check_daily_loss_limit():
+            self.gui_window.status_bar.showMessage("已触发每日最大亏损，今日禁止下单！")
+            return
+
         try:
             batch_order = self.gui_window.components["batch_order"]
             # print("orders:", batch_order.orders)
@@ -402,7 +407,7 @@ class TradingButtonsSection:
                         i, order_type, entry_price, symbol
                     )
                     if calculated_volume <= 0:
-                        logger.error("[空日志]", f"订单{i+1}：仓位计算失败，跳过")
+                        logger.error(f"订单{i+1}：仓位计算失败，跳过")
                         continue
                     volume = calculated_volume
                     # print(
@@ -471,16 +476,19 @@ class TradingButtonsSection:
                 self.gui_window.status_bar.showMessage(
                     f"批量{order_type}订单已成功下单"
                 )
-                # 播放提示音
-                winsound.Beep(
-                    config_manager.get("BEEP_SETTINGS", {}).get("FREQUENCY", 0),
-                    config_manager.get("BEEP_SETTINGS", {}).get("DURATION", 0),
-                )
+                # 播放提示音（防御非法频率）
+                freq = config_manager.get("BEEP_SETTINGS", {}).get("FREQUENCY", 0)
+                dur = config_manager.get("BEEP_SETTINGS", {}).get("DURATION", 0)
+                if not (37 <= freq <= 32767):
+                    freq = 1000
+                if not (10 <= dur <= 10000):
+                    dur = 200
+                winsound.Beep(freq, dur)
             else:
                 self.gui_window.status_bar.showMessage(f"批量{order_type}单失败！")
         except Exception as e:
             self.gui_window.status_bar.showMessage(f"批量下单出错：{str(e)}")
-            logger.error("[空日志]", f"下单错误详情：{str(e)}")
+            logger.error(f"下单错误详情：{str(e)}")
 
     def place_breakout_order(self, breakout_type: str):
         """
@@ -489,6 +497,11 @@ class TradingButtonsSection:
         Args:
             breakout_type: 'high' 或 'low'，表示高点或低点突破
         """
+        # 下单前风控检测
+        if not self.gui_window.check_daily_loss_limit():
+            self.gui_window.status_bar.showMessage("已触发每日最大亏损，今日禁止下单！")
+            return
+
         try:
             # 检查交易次数限制
             if not check_trade_limit(self.gui_window.db, self.gui_window):
@@ -621,7 +634,7 @@ class TradingButtonsSection:
                         i, order_direction, entry_price, symbol
                     )
                     if calculated_volume <= 0:
-                        logger.error("[空日志]", f"突破订单{i+1}：仓位计算失败，跳过")
+                        logger.error(f"突破订单{i+1}：仓位计算失败，跳过")
                         continue
                     volume = calculated_volume
                     # print(
@@ -677,16 +690,19 @@ class TradingButtonsSection:
                 )
                 self.gui_window.status_bar.showMessage(f"突破订单已成功下单")
 
-                # 播放提示音
-                winsound.Beep(
-                    config_manager.get("BEEP_SETTINGS", {}).get("FREQUENCY", 0),
-                    config_manager.get("BEEP_SETTINGS", {}).get("DURATION", 0),
-                )
+                # 播放提示音（防御非法频率）
+                freq = config_manager.get("BEEP_SETTINGS", {}).get("FREQUENCY", 0)
+                dur = config_manager.get("BEEP_SETTINGS", {}).get("DURATION", 0)
+                if not (37 <= freq <= 32767):
+                    freq = 1000
+                if not (10 <= dur <= 10000):
+                    dur = 200
+                winsound.Beep(freq, dur)
             else:
                 self.gui_window.status_bar.showMessage(f"{comment_prefix}失败！")
         except Exception as e:
             self.gui_window.status_bar.showMessage(f"挂突破单出错：{str(e)}")
-            logger.error("[空日志]", f"下单错误详情：{str(e)}")
+            logger.error(f"下单错误详情：{str(e)}")
 
     def cancel_all_pending_orders(self):
         """撤销所有挂单"""
@@ -734,7 +750,7 @@ class TradingButtonsSection:
                     self.trader.sync_closed_trades_to_excel()
                     # print("已同步平仓记录到Excel")
                 except Exception as e:
-                    logger.error("[空日志]", f"同步平仓记录到Excel失败: {str(e)}")
+                    logger.error(f"同步平仓记录到Excel失败: {str(e)}")
 
                 # 立即重新统计交易次数
                 try:
@@ -746,7 +762,7 @@ class TradingButtonsSection:
                         account_info.update_trade_count_display(self.gui_window.db)
                         # print("已更新交易次数统计")
                 except Exception as e:
-                    logger.error("[空日志]", f"更新交易次数统计失败: {str(e)}")
+                    logger.error(f"更新交易次数统计失败: {str(e)}")
 
                 # 更新盈亏显示
                 try:
@@ -754,7 +770,7 @@ class TradingButtonsSection:
                     pnl_info.update_daily_pnl_info(self.trader)
                     # print("已更新盈亏显示")
                 except Exception as e:
-                    logger.error("[空日志]", f"更新盈亏显示失败: {str(e)}")
+                    logger.error(f"更新盈亏显示失败: {str(e)}")
 
             else:
                 self.gui_window.status_bar.showMessage(
@@ -845,11 +861,14 @@ class TradingButtonsSection:
 
                 message = f"成功将{success_count}个持仓的止损移动到入场价({offset_text})！订单号: {', '.join(map(str, modified_positions))}"
                 self.gui_window.status_bar.showMessage(message)
-                # 播放提示音
-                winsound.Beep(
-                    config_manager.get("BEEP_SETTINGS", {}).get("FREQUENCY", 0),
-                    config_manager.get("BEEP_SETTINGS", {}).get("DURATION", 0),
-                )
+                # 播放提示音（防御非法频率）
+                freq = config_manager.get("BEEP_SETTINGS", {}).get("FREQUENCY", 0)
+                dur = config_manager.get("BEEP_SETTINGS", {}).get("DURATION", 0)
+                if not (37 <= freq <= 32767):
+                    freq = 1000
+                if not (10 <= dur <= 10000):
+                    dur = 200
+                winsound.Beep(freq, dur)
 
             if failed_positions:
                 # logger.error("[空日志]", f"以下订单修改失败: {', '.join(map(str, failed_positions)}")
@@ -862,7 +881,7 @@ class TradingButtonsSection:
 
         except Exception as e:
             self.gui_window.status_bar.showMessage(f"保本操作出错：{str(e)}")
-            logger.error("[空日志]", f"保本操作错误详情：{str(e)}")
+            logger.error(f"保本操作错误详情：{str(e)}")
 
     def get_timeframe(self, timeframe: str) -> int:
         """
@@ -975,7 +994,7 @@ class TradingButtonsSection:
 
         except Exception as e:
             self.gui_window.status_bar.showMessage(f"移动止损出错：{str(e)}")
-            logger.error("[空日志]", f"移动止损错误详情：{str(e)}")
+            logger.error(f"移动止损错误详情：{str(e)}")
 
     def calculate_breakeven_position_size(
         self, symbol, order_type, sl_price, batch_entry_price, batch_count

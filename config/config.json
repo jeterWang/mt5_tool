@@ -7,7 +7,7 @@
     "DEFAULT_TIMEFRAME": "M1",
     "Delta_TIMEZONE": 0,
     "TRADING_DAY_RESET_HOUR": 20,
-    "DAILY_LOSS_LIMIT": 150.0,
+    "DAILY_LOSS_LIMIT": 80.0,
     "DAILY_TRADE_LIMIT": 20,
     "GUI_SETTINGS": {
         "WINDOW_TOP": true,
@@ -52,7 +52,7 @@
             "checked": true
         },
         "order4": {
-            "volume": 0.21,
+            "volume": 0.01,
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,

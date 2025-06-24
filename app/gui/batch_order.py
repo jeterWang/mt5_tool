@@ -100,7 +100,9 @@ class BatchOrderSection:
                 }
             )
         self.refresh_orders_ui()
-        self.update_sl_mode(config_manager.get("SL_MODE")["DEFAULT_MODE"])
+        self.update_sl_mode(
+            config_manager.get("SL_MODE").get("DEFAULT_MODE", "FIXED_POINTS")
+        )
         self.update_position_sizing_mode(
             config_manager.get("POSITION_SIZING")["DEFAULT_MODE"]
         )
@@ -228,7 +230,9 @@ class BatchOrderSection:
         )
         self.refresh_orders_ui()
         # 重新应用当前模式设置
-        self.update_sl_mode(config_manager.get("SL_MODE")["DEFAULT_MODE"])
+        self.update_sl_mode(
+            config_manager.get("SL_MODE").get("DEFAULT_MODE", "FIXED_POINTS")
+        )
         self.update_position_sizing_mode(
             config_manager.get("POSITION_SIZING")["DEFAULT_MODE"]
         )
@@ -240,7 +244,9 @@ class BatchOrderSection:
         self.orders.pop(idx)
         self.refresh_orders_ui()
         # 重新应用当前模式设置
-        self.update_sl_mode(config_manager.get("SL_MODE")["DEFAULT_MODE"])
+        self.update_sl_mode(
+            config_manager.get("SL_MODE").get("DEFAULT_MODE", "FIXED_POINTS")
+        )
         self.update_position_sizing_mode(
             config_manager.get("POSITION_SIZING")["DEFAULT_MODE"]
         )
@@ -284,7 +290,7 @@ class BatchOrderSection:
             point = symbol_info.point
 
             # 根据交易方向和止损模式计算止损价格
-            sl_mode = config_manager.get("SL_MODE")["DEFAULT_MODE"]
+            sl_mode = config_manager.get("SL_MODE").get("DEFAULT_MODE", "FIXED_POINTS")
             sl_price = 0
 
             if sl_mode == "FIXED_POINTS":

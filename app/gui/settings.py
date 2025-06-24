@@ -216,7 +216,7 @@ class SettingsDialog(QDialog):
         self.sl_mode_combo = QComboBox()
         self.sl_mode_combo.addItems(["固定点数", "关键K线"])
         self.sl_mode_combo.setCurrentIndex(
-            0 if sl_mode["DEFAULT_MODE"] == "FIXED_POINTS" else 1
+            0 if sl_mode.get("DEFAULT_MODE", "FIXED_POINTS") == "FIXED_POINTS" else 1
         )
         sl_layout.addWidget(QLabel("默认止损模式:"))
         sl_layout.addWidget(self.sl_mode_combo)
