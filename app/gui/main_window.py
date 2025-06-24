@@ -128,7 +128,7 @@ class MT5GUI(QMainWindow):
         self.last_beep_time = 0
 
         # 设置窗口图标
-        self.setWindowIcon(QIcon(get_icon_path("icon.svg")))
+        self.setWindowIcon(QIcon(get_icon_path("icon.ico")))
 
         # 应用初始窗口置顶状态
         if config_manager.get("GUI_SETTINGS")["WINDOW_TOP"]:

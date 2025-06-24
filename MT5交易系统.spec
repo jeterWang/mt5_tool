@@ -5,7 +5,12 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('C:\\Users\\76090\\codes\\python\\mt5\\resources\\icons\\icon.ico', 'resources/icons/'), ('resources', 'resources'), ('config', 'config')],
+    datas=[
+        ('resources', 'resources'),
+        ('config', 'config'),
+        ('app', 'app'),
+        ('utils', 'utils'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -32,7 +37,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['C:\\Users\\76090\\codes\\python\\mt5\\resources\\icons\\icon.ico'],
+    icon='resources/icons/icon.ico',
 )
 coll = COLLECT(
     exe,
