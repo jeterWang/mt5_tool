@@ -272,6 +272,15 @@ class TradingButtonsSection:
             order_type: 订单类型，'buy' 或 'sell'
         """
         try:
+            batch_order = self.gui_window.components["batch_order"]
+            print("orders:", batch_order.orders)
+            for idx, row in enumerate(batch_order.order_rows):
+                print(f"row {idx} checked:", row["check"].isChecked())
+                print(f"row {idx} volume:", row["volume"].text())
+                print(f"row {idx} sl_points:", row["sl_points"].text())
+                print(f"row {idx} tp_points:", row["tp_points"].text())
+                print(f"row {idx} sl_candle:", row["sl_candle"].text())
+                print(f"row {idx} fixed_loss:", row["fixed_loss"].text())
             # 检查交易次数限制
             if not check_trade_limit(self.gui_window.db, self.gui_window):
                 return
@@ -288,7 +297,7 @@ class TradingButtonsSection:
 
             # 获取交易设置
             trading_settings = self.gui_window.components["trading_settings"]
-            batch_order = self.gui_window.components["batch_order"]
+            # batch_order = self.gui_window.components["batch_order"]
 
             symbol = trading_settings.symbol_input.currentText()
 
@@ -307,6 +316,8 @@ class TradingButtonsSection:
             has_positions = bool(positions)
 
             # 统计本次批量下单的有效订单数
+            # 先同步UI状态到数据
+            batch_order.sync_checked_from_ui()
             checked_orders = [order for order in batch_order.orders if order["checked"]]
             batch_count = len(checked_orders)
             if batch_count == 0:
@@ -528,8 +539,14 @@ class TradingButtonsSection:
 
             # 根据突破类型设置价格、订单类型
             if breakout_type == "high":
-                # 买入价格 = 前一根K线高点 + 高点偏移量 * 点值
-                entry_price = previous_high + high_offset * point
+                # 获取当前tick数据，计算点差
+                tick = mt5.symbol_info_tick(symbol)
+                if tick is None or tick.ask is None or tick.bid is None:
+                    self.gui_window.status_bar.showMessage(f"获取点差失败，无法挂单！")
+                    return
+                spread = tick.ask - tick.bid
+                # 买入价格 = 前一根K线高点 + 高点偏移量 * 点值 + 当前点差
+                entry_price = previous_high + high_offset * point + spread
                 order_type = "buy_stop"  # 使用buy_stop而不是buy
                 comment_prefix = f"{timeframe}高点突破买入"
             else:

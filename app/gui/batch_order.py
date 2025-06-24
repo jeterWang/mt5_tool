@@ -107,9 +107,12 @@ class BatchOrderSection:
             # 勾选框
             check = QCheckBox()
             check.setChecked(order["checked"])
-            check.stateChanged.connect(
-                lambda state, i=idx: self.on_checked_changed(i, state)
-            )
+            check.stateChanged.connect(self.make_checked_slot(idx))
+            # 如果需要禁用勾选框的逻辑在此处（如根据某些条件）
+            # 例如：if not order['可用']: check.setEnabled(False); order["checked"] = False
+            # 这里假设有禁用逻辑，演示如下：
+            if not check.isEnabled():
+                order["checked"] = False
             row_layout.addWidget(check)
 
             # 标签
@@ -510,6 +513,16 @@ class BatchOrderSection:
             row["tp_points"].setRange(
                 symbol_params["min_tp_points"], symbol_params["max_tp_points"]
             )
+
+    def make_checked_slot(self, idx):
+        def slot(state):
+            self.on_checked_changed(idx, state)
+
+        return slot
+
+    def sync_checked_from_ui(self):
+        for idx, row in enumerate(self.order_rows):
+            self.orders[idx]["checked"] = row["check"].isChecked()
 
 
 # 模块级函数，供其他模块调用
