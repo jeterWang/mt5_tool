@@ -60,21 +60,23 @@ class PnlInfoSection:
                                 df["close_time"].dt.strftime("%Y-%m-%d") == trading_day
                             ]
                             realized_pnl = today_df["profit"].sum()
-                        print(f"今日({trading_day})已实现盈亏: {realized_pnl:.2f}")
+                        # print(f"今日({trading_day})已实现盈亏: {realized_pnl:.2f}")
                     else:
-                        print("trade_records.xlsx中缺少profit字段或文件为空")
+                        pass
+                        # print("trade_records.xlsx中缺少profit字段或文件为空")
                 except Exception as e:
-                    print(f"读取已实现盈亏数据出错: {str(e)}")
+                    # print(f"读取已实现盈亏数据出错: {str(e)}")
                     realized_pnl = 0
             else:
-                print(f"trade_records.xlsx文件不存在: {excel_path}")
+                pass
+                # print(f"trade_records.xlsx文件不存在: {excel_path}")
 
             # 获取浮动盈亏
             positions = trader.get_all_positions()
             unrealized_pnl = (
                 sum(position["profit"] for position in positions) if positions else 0
             )
-            print(f"当前浮动盈亏: {unrealized_pnl:.2f}")
+            # print(f"当前浮动盈亏: {unrealized_pnl:.2f}")
 
             # 计算总盈亏
             total = realized_pnl + unrealized_pnl
@@ -93,7 +95,7 @@ class PnlInfoSection:
                 )
                 self.total_pnl_label.setText(f"日内总盈亏: {total:.2f}")
         except Exception as e:
-            print(f"更新盈亏信息出错: {str(e)}")
+            # print(f"更新盈亏信息出错: {str(e)}")
             self.realized_label.setText("今日已实现盈亏: --")
             self.unrealized_label.setText("当前浮动盈亏: --")
             self.total_pnl_label.setText("日内总盈亏: --")

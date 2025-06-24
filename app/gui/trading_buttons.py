@@ -7,6 +7,9 @@
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton
 import MetaTrader5 as mt5
 import winsound
+import logging
+
+logger = logging.getLogger(__name__)
 
 from config.loader import (
     GUI_SETTINGS,
@@ -273,14 +276,15 @@ class TradingButtonsSection:
         """
         try:
             batch_order = self.gui_window.components["batch_order"]
-            print("orders:", batch_order.orders)
+            # print("orders:", batch_order.orders)
             for idx, row in enumerate(batch_order.order_rows):
-                print(f"row {idx} checked:", row["check"].isChecked())
-                print(f"row {idx} volume:", row["volume"].text())
-                print(f"row {idx} sl_points:", row["sl_points"].text())
-                print(f"row {idx} tp_points:", row["tp_points"].text())
-                print(f"row {idx} sl_candle:", row["sl_candle"].text())
-                print(f"row {idx} fixed_loss:", row["fixed_loss"].text())
+                pass
+                # print(f"row {idx} checked:", row["check"].isChecked())
+                # print(f"row {idx} volume:", row["volume"].text())
+                # print(f"row {idx} sl_points:", row["sl_points"].text())
+                # print(f"row {idx} tp_points:", row["tp_points"].text())
+                # print(f"row {idx} sl_candle:", row["sl_candle"].text())
+                # print(f"row {idx} fixed_loss:", row["fixed_loss"].text())
             # 检查交易次数限制
             if not check_trade_limit(self.gui_window.db, self.gui_window):
                 return
@@ -389,25 +393,25 @@ class TradingButtonsSection:
                 volume = order["volume"]
                 if not has_positions and position_sizing_mode == "FIXED_LOSS":
                     if order["fixed_loss"] <= 0:
-                        print(f"订单{i+1}：固定亏损金额无效，跳过")
+                        # print(f"订单{i+1}：固定亏损金额无效，跳过")
                         continue
                     tick = mt5.symbol_info_tick(symbol)
                     if not tick:
-                        print(f"订单{i+1}：无法获取当前价格，跳过")
+                        # print(f"订单{i+1}：无法获取当前价格，跳过")
                         continue
                     entry_price = tick.ask if order_type == "buy" else tick.bid
                     calculated_volume = batch_order.calculate_position_size_for_order(
                         i, order_type, entry_price, symbol
                     )
                     if calculated_volume <= 0:
-                        print(f"订单{i+1}：仓位计算失败，跳过")
+                        logger.error("[空日志]", f"订单{i+1}：仓位计算失败，跳过")
                         continue
                     volume = calculated_volume
-                    print(
-                        f"订单{i+1}：固定亏损{order['fixed_loss']}美元，计算手数{volume}"
-                    )
+                    # print(
+                    # f"订单{i+1}：固定亏损{order['fixed_loss']}美元，计算手数{volume}"
+                    # )
                 elif volume <= 0:
-                    print(f"订单{i+1}：手数无效，跳过")
+                    # print(f"订单{i+1}：手数无效，跳过")
                     continue
                 if sl_mode == "FIXED_POINTS":
                     mt5_order = self.trader.place_order_with_tp_sl(
@@ -474,7 +478,7 @@ class TradingButtonsSection:
                 self.gui_window.status_bar.showMessage(f"批量{order_type}单失败！")
         except Exception as e:
             self.gui_window.status_bar.showMessage(f"批量下单出错：{str(e)}")
-            print(f"下单错误详情：{str(e)}")
+            logger.error("[空日志]", f"下单错误详情：{str(e)}")
 
     def place_breakout_order(self, breakout_type: str):
         """
@@ -601,20 +605,20 @@ class TradingButtonsSection:
                 volume = order["volume"]
                 if not has_positions and position_sizing_mode == "FIXED_LOSS":
                     if order["fixed_loss"] <= 0:
-                        print(f"突破订单{i+1}：固定亏损金额无效，跳过")
+                        # print(f"突破订单{i+1}：固定亏损金额无效，跳过")
                         continue
                     calculated_volume = batch_order.calculate_position_size_for_order(
                         i, order_direction, entry_price, symbol
                     )
                     if calculated_volume <= 0:
-                        print(f"突破订单{i+1}：仓位计算失败，跳过")
+                        logger.error("[空日志]", f"突破订单{i+1}：仓位计算失败，跳过")
                         continue
                     volume = calculated_volume
-                    print(
-                        f"突破订单{i+1}：固定亏损{order['fixed_loss']}美元，计算手数{volume}"
-                    )
+                    # print(
+                    # f"突破订单{i+1}：固定亏损{order['fixed_loss']}美元，计算手数{volume}"
+                    # )
                 elif volume <= 0:
-                    print(f"突破订单{i+1}：手数无效，跳过")
+                    # print(f"突破订单{i+1}：手数无效，跳过")
                     continue
                 sl_price = None
                 if sl_mode == "FIXED_POINTS":
@@ -668,7 +672,7 @@ class TradingButtonsSection:
                 self.gui_window.status_bar.showMessage(f"{comment_prefix}失败！")
         except Exception as e:
             self.gui_window.status_bar.showMessage(f"挂突破单出错：{str(e)}")
-            print(f"下单错误详情：{str(e)}")
+            logger.error("[空日志]", f"下单错误详情：{str(e)}")
 
     def cancel_all_pending_orders(self):
         """撤销所有挂单"""
@@ -714,9 +718,9 @@ class TradingButtonsSection:
                 # 立即同步平仓记录到Excel
                 try:
                     self.trader.sync_closed_trades_to_excel()
-                    print("已同步平仓记录到Excel")
+                    # print("已同步平仓记录到Excel")
                 except Exception as e:
-                    print(f"同步平仓记录到Excel失败: {str(e)}")
+                    logger.error("[空日志]", f"同步平仓记录到Excel失败: {str(e)}")
 
                 # 立即重新统计交易次数
                 try:
@@ -726,17 +730,17 @@ class TradingButtonsSection:
                         # 更新界面显示
                         account_info = self.gui_window.components["account_info"]
                         account_info.update_trade_count_display(self.gui_window.db)
-                        print("已更新交易次数统计")
+                        # print("已更新交易次数统计")
                 except Exception as e:
-                    print(f"更新交易次数统计失败: {str(e)}")
+                    logger.error("[空日志]", f"更新交易次数统计失败: {str(e)}")
 
                 # 更新盈亏显示
                 try:
                     pnl_info = self.gui_window.components["pnl_info"]
                     pnl_info.update_daily_pnl_info(self.trader)
-                    print("已更新盈亏显示")
+                    # print("已更新盈亏显示")
                 except Exception as e:
-                    print(f"更新盈亏显示失败: {str(e)}")
+                    logger.error("[空日志]", f"更新盈亏显示失败: {str(e)}")
 
             else:
                 self.gui_window.status_bar.showMessage(
@@ -810,7 +814,7 @@ class TradingButtonsSection:
                     modified_positions.append(position_id)
                 else:
                     failed_positions.append(position_id)
-                    print(f"修改止损失败，订单号: {position_id}")
+                    logger.error(f"修改止损失败，订单号: {position_id}")
 
             # 显示操作结果
             if success_count > 0:
@@ -831,7 +835,7 @@ class TradingButtonsSection:
                 )
 
             if failed_positions:
-                print(f"以下订单修改失败: {', '.join(map(str, failed_positions))}")
+                # logger.error("[空日志]", f"以下订单修改失败: {', '.join(map(str, failed_positions)}")
                 # 如果有失败的，在日志中显示
                 if success_count == 0:
                     self.gui_window.status_bar.showMessage(f"所有持仓保本操作失败！")
@@ -841,7 +845,7 @@ class TradingButtonsSection:
 
         except Exception as e:
             self.gui_window.status_bar.showMessage(f"保本操作出错：{str(e)}")
-            print(f"保本操作错误详情：{str(e)}")
+            logger.error("[空日志]", f"保本操作错误详情：{str(e)}")
 
     def get_timeframe(self, timeframe: str) -> int:
         """
@@ -918,7 +922,7 @@ class TradingButtonsSection:
 
                 # 获取前一根K线的最高点和最低点（索引1是前一根K线，因为索引0是当前K线）
                 prev_candle = rates[1]  # 使用索引1获取前一根K线
-                print(prev_candle)
+                # print(prev_candle)
                 if pos_type == mt5.POSITION_TYPE_BUY:
                     # 买单移动到前一根K线的最低价
                     new_sl = prev_candle["low"]
@@ -949,11 +953,11 @@ class TradingButtonsSection:
                 self.gui_window.status_bar.showMessage("所有持仓止损移动失败！")
 
             # 打印详细信息
-            print("\n".join(details))
+            # print("\n".join(details))
 
         except Exception as e:
             self.gui_window.status_bar.showMessage(f"移动止损出错：{str(e)}")
-            print(f"移动止损错误详情：{str(e)}")
+            logger.error("[空日志]", f"移动止损错误详情：{str(e)}")
 
     def calculate_breakeven_position_size(
         self, symbol, order_type, sl_price, batch_entry_price, batch_count
@@ -1001,5 +1005,5 @@ class TradingButtonsSection:
             v2 = round(v2 / volume_step) * volume_step
             return v2
         except Exception as e:
-            print(f"盈亏平衡手数计算出错: {str(e)}")
+            # print(f"盈亏平衡手数计算出错: {str(e)}")
             return 0

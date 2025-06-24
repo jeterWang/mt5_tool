@@ -52,12 +52,12 @@
             "checked": true
         },
         "order4": {
-            "volume": 0.01,
+            "volume": 0.21,
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
             "fixed_loss": 5.0,
-            "checked": true
+            "checked": false
         }
     },
     "POSITION_SIZING": {

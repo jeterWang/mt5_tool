@@ -76,12 +76,13 @@ class AccountInfoSection:
 
         # 打印数据库路径
         if hasattr(db, "db_path"):
-            print(f"数据库路径: {db.db_path}")
-            print(f"数据库文件是否存在: {os.path.exists(db.db_path)}")
+            pass
+        # print(f"数据库路径: {db.db_path}")
+            # print(f"数据库文件是否存在: {os.path.exists(db.db_path)}")
 
         # 获取今日实际交易次数
         count = db.get_today_count()
-        print(f"数据库中获取到的今日交易次数: {count}")
+        # print(f"数据库中获取到的今日交易次数: {count}")
 
         # 计算剩余交易次数
         remaining = max(0, DAILY_TRADE_LIMIT - count)
@@ -91,9 +92,9 @@ class AccountInfoSection:
         )
 
         # 调试信息
-        print(
-            f"更新剩余交易次数显示: 当前DAILY_TRADE_LIMIT={DAILY_TRADE_LIMIT}, 已交易={count}, 剩余={remaining}"
-        )
+        # print(
+        #     f"更新剩余交易次数显示: 当前DAILY_TRADE_LIMIT={DAILY_TRADE_LIMIT}, 已交易={count}, 剩余={remaining}"
+        # )
 
         if remaining == 0:
             self.trade_count_label.setStyleSheet(

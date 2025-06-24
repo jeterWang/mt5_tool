@@ -67,7 +67,7 @@ def get_symbol_params(symbol: str, is_connected: bool = False) -> Dict:
 
         return params
     except Exception as e:
-        print(f"获取{symbol}参数出错：{str(e)}")
+        # print(f"获取{symbol}参数出错：{str(e)}")
         # 返回默认参数
         return {
             "volume": 0.10,

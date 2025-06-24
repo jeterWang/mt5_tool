@@ -40,44 +40,44 @@ def check_trade_limit(db, gui_window):
 
         # 直接从配置文件读取，确保获取最新值
         config_path = get_config_path()
-        print(f"检查交易次数限制，配置文件路径: {config_path}")
+        # print(f"检查交易次数限制，配置文件路径: {config_path}")
 
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
                 file_limit = config.get("DAILY_TRADE_LIMIT", DAILY_TRADE_LIMIT)
-                print(f"从配置文件读取DAILY_TRADE_LIMIT = {file_limit}")
+                # print(f"从配置文件读取DAILY_TRADE_LIMIT = {file_limit}")
         except Exception as e:
-            print(f"读取配置文件出错: {str(e)}, 使用内存中的值: {DAILY_TRADE_LIMIT}")
+            # print(f"读取配置文件出错: {str(e)}, 使用内存中的值: {DAILY_TRADE_LIMIT}")
             file_limit = DAILY_TRADE_LIMIT
 
         # 比较内存中的值和文件中的值，如果不一致则使用文件中的值
         if DAILY_TRADE_LIMIT != file_limit:
-            print(
-                f"警告：内存中的DAILY_TRADE_LIMIT({DAILY_TRADE_LIMIT})与文件中的值({file_limit})不一致"
-            )
+            # print(
+            # f"警告：内存中的DAILY_TRADE_LIMIT({DAILY_TRADE_LIMIT})与文件中的值({file_limit})不一致"
+            # )
             # 使用文件中的值
             limit_to_use = file_limit
         else:
             limit_to_use = DAILY_TRADE_LIMIT
 
-        print(f"检查交易次数限制，当前设置为: {limit_to_use}")
+        # print(f"检查交易次数限制，当前设置为: {limit_to_use}")
 
         # 获取今日实际交易次数
         count = db.get_today_count()
-        print(f"今日已交易次数: {count}, 最大允许次数: {limit_to_use}")
+        # print(f"今日已交易次数: {count}, 最大允许次数: {limit_to_use}")
 
         if count >= limit_to_use:
             message = f"已达到每日交易次数限制({count}/{limit_to_use})！"
             gui_window.status_bar.showMessage(message)
-            print(message)
+            # print(message)
             # 播放警告声音
             winsound.Beep(1000, 1000)  # 频率1000，持续1秒
             return False
 
         return True
     except Exception as e:
-        print(f"检查交易次数限制出错: {str(e)}")
+        # print(f"检查交易次数限制出错: {str(e)}")
         return True  # 出错时允许继续交易，避免错误阻止用户交易
 
 
@@ -113,7 +113,7 @@ def check_daily_loss_limit(trader, db, gui_window):
                     df_today = df[df["close_time"].astype(str).str.startswith(today)]
                     realized_loss = df_today["profit"].sum()
             except Exception as e:
-                print(f"读取已实现盈亏数据出错: {str(e)}")
+                # print(f"读取已实现盈亏数据出错: {str(e)}")
                 pass
 
         # 2. 统计当前未实现浮动盈亏
@@ -136,7 +136,7 @@ def check_daily_loss_limit(trader, db, gui_window):
             return False
         return True
     except Exception as e:
-        print(f"风控检查出错：{str(e)}")
+        # print(f"风控检查出错：{str(e)}")
         return True  # 出错时允许继续交易，避免错误阻止用户交易
 
 

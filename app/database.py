@@ -5,6 +5,8 @@
 """
 
 import sqlite3
+import logging
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta
 import os
 from utils.paths import get_data_path
@@ -20,13 +22,13 @@ class TradeDatabase:
         """初始化数据库"""
         self.db_path = get_data_path("trade_history.db")
         self.conn = None
-        print(f"初始化交易数据库: {self.db_path}")
+        # print(f"初始化交易数据库: {self.db_path}")
         self.create_tables()
 
     def create_tables(self):
         """创建数据库表"""
         try:
-            print(f"连接数据库并创建表: {self.db_path}")
+            # print(f"连接数据库并创建表: {self.db_path}")
             self.conn = sqlite3.connect(self.db_path)
             cursor = self.conn.cursor()
 
@@ -54,17 +56,17 @@ class TradeDatabase:
             )
 
             self.conn.commit()
-            print("数据库表创建成功")
+            # print("数据库表创建成功")
 
             # 检查数据库是否包含今日交易记录
             today = self.get_trading_day()
             cursor.execute("SELECT count FROM trade_count WHERE date = ?", (today,))
             result = cursor.fetchone()
-            print(f"今日({today})交易记录: {result}")
+            # print(f"今日({today})交易记录: {result}")
 
         except Exception as e:
             logging.error(f"创建数据库表出错: {str(e)}")
-            print(f"创建数据库表出错: {str(e)}")
+            # print(f"创建数据库表出错: {str(e)}")
         finally:
             if self.conn:
                 self.conn.close()
@@ -86,19 +88,19 @@ class TradeDatabase:
         """获取今日交易次数"""
         today = self.get_trading_day()
         try:
-            print(f"正在获取今日({today})交易次数，数据库路径: {self.db_path}")
+        # print(f"正在获取今日({today})交易次数，数据库路径: {self.db_path}")
             self.conn = sqlite3.connect(self.db_path)
             cursor = self.conn.cursor()
             cursor.execute("SELECT count FROM trade_count WHERE date = ?", (today,))
             result = cursor.fetchone()
             if result:
-                print(f"数据库中今日交易次数: {result[0]}")
+        # print(f"数据库中今日交易次数: {result[0]}")
                 return result[0]
-            print("数据库中今日无交易记录")
+            # print("数据库中今日无交易记录")
             return 0
         except Exception as e:
             logging.error(f"获取今日交易次数出错: {str(e)}")
-            print(f"获取今日交易次数出错: {str(e)}")
+            # print(f"获取今日交易次数出错: {str(e)}")
             return 0
         finally:
             if self.conn:
@@ -221,7 +223,7 @@ class TradeDatabase:
                 )
 
             self.conn.commit()
-            print(f"已更新今日({today})交易次数为: {count}")
+            # print(f"已更新今日({today})交易次数为: {count}")
             return True
         except Exception as e:
             logging.error(f"设置交易次数出错: {str(e)}")
@@ -237,7 +239,7 @@ class TradeDatabase:
             file_path = os.path.join(data_dir, "trade_records.xlsx")
 
             if not os.path.exists(file_path):
-                print("trade_records.xlsx文件不存在，跳过交易次数更新")
+                # print("trade_records.xlsx文件不存在，跳过交易次数更新")
                 return False
 
             # 获取账户ID
@@ -252,22 +254,22 @@ class TradeDatabase:
             try:
                 df = pd.read_excel(file_path, sheet_name=str(account_id))
             except Exception as e:
-                print(f"读取账户{account_id}的sheet失败: {e}")
+                logger.error("[空日志]", f"读取账户{account_id}的sheet失败: {e}")
                 return False
 
             if df.empty or "open_time" not in df.columns:
-                print("xlsx文件为空或缺少open_time字段")
+                # print("xlsx文件为空或缺少open_time字段")
                 return False
 
             # 获取交易日
             today = self.get_trading_day()
-            print(f"统计交易日 {today} 的交易次数")
+            # print(f"统计交易日 {today} 的交易次数")
 
             # 过滤今日交易记录
             today_trades = self.filter_today_trades(df, today)
 
             if today_trades.empty:
-                print(f"今日({today})无交易记录")
+                # print(f"今日({today})无交易记录")
                 self.set_today_count(0)
                 return True
 
@@ -276,15 +278,15 @@ class TradeDatabase:
 
             # 更新数据库
             self.set_today_count(merged_count)
-            print(
-                f"今日共有 {len(today_trades)} 笔原始交易，合并后为 {merged_count} 笔"
-            )
+            # print(
+            #     f"今日共有 {len(today_trades)} 笔原始交易，合并后为 {merged_count} 笔"
+            # )
 
             return True
 
         except Exception as e:
             logging.error(f"自动更新交易次数出错: {str(e)}")
-            print(f"自动更新交易次数出错: {str(e)}")
+            # print(f"自动更新交易次数出错: {str(e)}")
             return False
 
     def filter_today_trades(self, df, today):
@@ -310,7 +312,7 @@ class TradeDatabase:
             return today_trades.sort_values("open_time")
 
         except Exception as e:
-            print(f"过滤今日交易出错: {e}")
+            # print(f"过滤今日交易出错: {e}")
             return pd.DataFrame()
 
     def merge_trades_within_1min(self, trades_df):

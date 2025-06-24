@@ -127,16 +127,16 @@ class TradingSettingsSection:
             # 先清空当前列表
             self.symbol_input.clear()
 
-            print(f"trading_settings.update_symbols_list: 当前SYMBOLS = {SYMBOLS}")
+            # print(f"trading_settings.update_symbols_list: 当前SYMBOLS = {SYMBOLS}")
 
             # 获取交易品种列表
             symbols = trader.get_all_symbols()
 
             # 获取配置文件中的交易品种（保持原有顺序）
             config_symbols = SYMBOLS.copy()  # 创建副本以避免引用问题
-            print(
-                f"trading_settings.update_symbols_list: 使用配置中的SYMBOLS = {config_symbols}"
-            )
+            # print(
+            #     f"trading_settings.update_symbols_list: 使用配置中的SYMBOLS = {config_symbols}"
+            # )
 
             # 添加品种到下拉列表，保持配置文件中的顺序
             for symbol in config_symbols:
@@ -151,5 +151,5 @@ class TradingSettingsSection:
 
             return None
         except Exception as e:
-            print(f"更新交易品种列表出错：{str(e)}")
+            # print(f"更新交易品种列表出错：{str(e)}")
             return None

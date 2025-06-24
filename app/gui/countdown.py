@@ -131,6 +131,7 @@ class CountdownSection:
                     return current_timestamp
 
         except Exception as e:
-            print(f"更新倒计时出错：{str(e)}")
+            pass
+            # print(f"更新倒计时出错：{str(e)}")
 
         return last_beep_time

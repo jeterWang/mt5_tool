@@ -80,7 +80,8 @@ class PositionsTableSection:
                 )
                 self.positions_table.setCellWidget(i, 6, close_btn)
         except Exception as e:
-            print(f"更新持仓信息出错：{str(e)}")
+            pass
+            # print(f"更新持仓信息出错：{str(e)}")
 
     def close_position(self, ticket, trader, gui_window):
         """

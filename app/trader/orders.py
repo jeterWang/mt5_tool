@@ -5,6 +5,8 @@ MT5订单操作模块
 """
 
 import MetaTrader5 as mt5
+import logging
+logger = logging.getLogger(__name__)
 from typing import Dict, List, Optional, Union
 
 
@@ -35,12 +37,12 @@ def place_order(
     try:
         symbol_info = mt5.symbol_info(symbol)
         if symbol_info is None:
-            print(f"未找到交易品种: {symbol}")
+            # print(f"未找到交易品种: {symbol}")
             return None
 
         if not symbol_info.visible:
             if not mt5.symbol_select(symbol, True):
-                print(f"选择交易品种失败: {symbol}")
+                logger.error("[空日志]", f"选择交易品种失败: {symbol}")
                 return None
 
         point = symbol_info.point
@@ -49,7 +51,7 @@ def place_order(
         elif order_type.lower() == "sell":
             order_type = mt5.ORDER_TYPE_SELL
         else:
-            print("无效的订单类型")
+            # print("无效的订单类型")
             return None
 
         request = {
@@ -76,11 +78,11 @@ def place_order(
 
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"下单失败: {result.comment}")
+            logger.error("[空日志]", f"下单失败: {result.comment}")
             return None
         return result.order
     except Exception as e:
-        print(f"下单出错: {str(e)}")
+        # print(f"下单出错: {str(e)}")
         return None
 
 
@@ -112,7 +114,7 @@ def place_order_with_tp_sl(
         # 获取当前价格
         symbol_info = mt5.symbol_info(symbol)
         if symbol_info is None:
-            print(f"获取{symbol}信息失败")
+            logger.error("[空日志]", f"获取{symbol}信息失败")
             return None
 
         # 计算止损止盈价格
@@ -174,11 +176,11 @@ def place_order_with_tp_sl(
         # 发送订单
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"下单失败，错误代码：{result.retcode}")
+            logger.error("[空日志]", f"下单失败，错误代码：{result.retcode}")
             return None
         return result.order
     except Exception as e:
-        print(f"下单出错：{str(e)}")
+        # print(f"下单出错：{str(e)}")
         return None
 
 
@@ -207,7 +209,7 @@ def place_order_with_partial_tp(
     # 验证分批止盈设置
     total_volume = sum(level["volume"] for level in tp_levels)
     if total_volume > volume:
-        print("分批止盈总量不能超过订单总量")
+        # print("分批止盈总量不能超过订单总量")
         return None
 
     # 创建主订单
@@ -278,7 +280,7 @@ def close_position(ticket: int) -> bool:
         result = mt5.order_send(request)
         return result.retcode == mt5.TRADE_RETCODE_DONE
     except Exception as e:
-        print(f"平仓出错：{str(e)}")
+        # print(f"平仓出错：{str(e)}")
         return False
 
 
@@ -296,7 +298,7 @@ def cancel_order(ticket: int) -> bool:
         # 获取订单信息
         order = mt5.orders_get(ticket=ticket)
         if order is None or len(order) == 0:
-            print(f"未找到订单：{ticket}")
+            # print(f"未找到订单：{ticket}")
             return False
 
         order = order[0]
@@ -311,12 +313,12 @@ def cancel_order(ticket: int) -> bool:
         # 发送撤销请求
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"撤销订单失败，错误代码：{result.retcode}")
+            logger.error("[空日志]", f"撤销订单失败，错误代码：{result.retcode}")
             return False
 
         return True
     except Exception as e:
-        print(f"撤销订单出错：{str(e)}")
+        # print(f"撤销订单出错：{str(e)}")
         return False
 
 
@@ -348,13 +350,13 @@ def place_pending_order(
         # 获取交易品种信息
         symbol_info = mt5.symbol_info(symbol)
         if symbol_info is None:
-            print(f"获取{symbol}信息失败")
+            logger.error("[空日志]", f"获取{symbol}信息失败")
             return None
 
         # 确保交易品种可见
         if not symbol_info.visible:
             if not mt5.symbol_select(symbol, True):
-                print(f"选择交易品种失败: {symbol}")
+                logger.error("[空日志]", f"选择交易品种失败: {symbol}")
                 return None
 
         # 设置订单类型
@@ -368,7 +370,7 @@ def place_pending_order(
             # 计算止盈价格（如果提供了止盈点数）
             tp_price = price - tp_points * symbol_info.point if tp_points > 0 else 0
         else:
-            print(f"不支持的订单类型: {order_type}")
+            # print(f"不支持的订单类型: {order_type}")
             return None
 
         # 准备订单请求
@@ -396,13 +398,13 @@ def place_pending_order(
         # 发送订单
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"挂单失败，错误代码：{result.retcode}，描述：{result.comment}")
+            logger.error("[空日志]", f"挂单失败，错误代码：{result.retcode}，描述：{result.comment}")
             return None
 
         return result.order
 
     except Exception as e:
-        print(f"挂单出错：{str(e)}")
+        # print(f"挂单出错：{str(e)}")
         return None
 
 
@@ -432,13 +434,13 @@ def place_order_with_key_level_sl(
         # 获取交易品种信息
         symbol_info = mt5.symbol_info(symbol)
         if symbol_info is None:
-            print(f"获取{symbol}信息失败")
+            logger.error("[空日志]", f"获取{symbol}信息失败")
             return None
 
         # 确保交易品种可见
         if not symbol_info.visible:
             if not mt5.symbol_select(symbol, True):
-                print(f"选择交易品种失败: {symbol}")
+                logger.error("[空日志]", f"选择交易品种失败: {symbol}")
                 return None
 
         # 设置订单类型
@@ -456,7 +458,7 @@ def place_order_with_key_level_sl(
             # 计算止盈价格（如果提供了止盈点数）
             tp_price = price - tp_points * symbol_info.point if tp_points > 0 else 0
         else:
-            print(f"不支持的订单类型: {order_type}")
+            # print(f"不支持的订单类型: {order_type}")
             return None
 
         # 准备订单请求
@@ -484,13 +486,13 @@ def place_order_with_key_level_sl(
         # 发送订单
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"下单失败，错误代码：{result.retcode}，描述：{result.comment}")
+            logger.error("[空日志]", f"下单失败，错误代码：{result.retcode}，描述：{result.comment}")
             return None
 
         return result.order
 
     except Exception as e:
-        print(f"下单出错：{str(e)}")
+        # print(f"下单出错：{str(e)}")
         return None
 
 
@@ -510,7 +512,7 @@ def modify_position_sl_tp(ticket: int, sl: float = None, tp: float = None) -> bo
         # 获取持仓信息
         position = mt5.positions_get(ticket=ticket)
         if not position:
-            print(f"未找到持仓: {ticket}")
+            # print(f"未找到持仓: {ticket}")
             return False
 
         position = position[0]._asdict()
@@ -538,13 +540,13 @@ def modify_position_sl_tp(ticket: int, sl: float = None, tp: float = None) -> bo
         # 发送修改请求
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            print(
-                f"修改止损止盈失败，错误代码：{result.retcode}，描述：{result.comment}"
-            )
+            # print(
+            # f"修改止损止盈失败，错误代码：{result.retcode}，描述：{result.comment}"
+            # )
             return False
 
         return True
 
     except Exception as e:
-        print(f"修改止损止盈出错：{str(e)}")
+        # print(f"修改止损止盈出错：{str(e)}")
         return False

@@ -5,6 +5,9 @@ MT5交易系统主窗口
 """
 
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -83,13 +86,13 @@ class MT5GUI(QMainWindow):
         _current_window = self
 
         # 确保在初始化前加载最新配置
-        print(f"MT5GUI初始化前SYMBOLS = {SYMBOLS}")
+        # print(f"MT5GUI初始化前SYMBOLS = {SYMBOLS}")
         load_config()
 
         # 重要：打印交易次数限制配置
-        print(f"MT5GUI初始化 - 当前DAILY_TRADE_LIMIT = {DAILY_TRADE_LIMIT}")
+        # print(f"MT5GUI初始化 - 当前DAILY_TRADE_LIMIT = {DAILY_TRADE_LIMIT}")
 
-        print(f"MT5GUI初始化后SYMBOLS = {SYMBOLS}")
+        # print(f"MT5GUI初始化后SYMBOLS = {SYMBOLS}")
 
         self.trader = None
 
@@ -306,7 +309,7 @@ class MT5GUI(QMainWindow):
 
         update_position_sizing_mode(mode)
 
-    def connect_mt5(self):
+    def connect_mt5(self) -> None:
         """连接到MT5"""
         try:
             if self.trader is None:
@@ -374,13 +377,13 @@ class MT5GUI(QMainWindow):
             return
 
         # 打印更新前的SYMBOLS
-        print(f"update_symbols_list: 更新前SYMBOLS = {SYMBOLS}")
+        # print(f"update_symbols_list: 更新前SYMBOLS = {SYMBOLS}")
 
         # 重新加载配置，确保使用最新的SYMBOLS列表
         load_config()
 
         # 打印更新后的SYMBOLS
-        print(f"update_symbols_list: 更新后SYMBOLS = {SYMBOLS}")
+        # print(f"update_symbols_list: 更新后SYMBOLS = {SYMBOLS}")
 
         trading_settings = self.components["trading_settings"]
         trading_settings.update_symbols_list(self.trader)
@@ -432,7 +435,8 @@ class MT5GUI(QMainWindow):
             try:
                 self.trader.sync_closed_trades_to_excel()
             except Exception as e:
-                print(f"同步平仓单到excel出错: {str(e)}")
+                pass
+                # print(f"同步平仓单到excel出错: {str(e)}")
 
     def update_daily_pnl_info(self):
         """实时刷新盈亏信息"""
@@ -521,7 +525,7 @@ class MT5GUI(QMainWindow):
         if self.trader and self.trader.is_connected():
             account_info = self.components["account_info"]
             account_info.update_trade_count_display(self.db)
-            print("已更新交易次数显示")
+            # print("已更新交易次数显示")
 
         # 更新状态栏提示
         self.status_bar.showMessage("配置已更新")
@@ -538,9 +542,9 @@ class MT5GUI(QMainWindow):
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
                 file_limit = config.get("DAILY_TRADE_LIMIT")
-                print(f"从配置文件读取到DAILY_TRADE_LIMIT = {file_limit}")
+                # print(f"从配置文件读取到DAILY_TRADE_LIMIT = {file_limit}")
         except Exception as e:
-            print(f"读取配置文件失败: {e}")
+            logger.error("[空日志]", f"读取配置文件失败: {e}")
 
         # 再次加载配置以更新内存中的值
         load_config()
@@ -548,11 +552,11 @@ class MT5GUI(QMainWindow):
         # 打印更新后的值
         from config.loader import DAILY_TRADE_LIMIT as updated_limit
 
-        print(f"内存中更新后的DAILY_TRADE_LIMIT = {updated_limit}")
+        # print(f"内存中更新后的DAILY_TRADE_LIMIT = {updated_limit}")
 
         # 检查是否真的更新了
         if "file_limit" in locals() and file_limit != updated_limit:
-            print(
+            logger.warning("[空日志]", 
                 f"警告: 文件中的值({file_limit})与更新后内存中的值({updated_limit})不一致!"
             )
 
@@ -583,4 +587,5 @@ class MT5GUI(QMainWindow):
                 account_info = self.components["account_info"]
                 account_info.update_trade_count_display(self.db)
         except Exception as e:
-            print(f"自动更新交易次数出错: {str(e)}")
+            pass
+            # print(f"自动更新交易次数出错: {str(e)}")

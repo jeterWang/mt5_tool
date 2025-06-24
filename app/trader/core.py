@@ -5,6 +5,8 @@ MT5交易核心模块
 """
 
 import MetaTrader5 as mt5
+import logging
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta
 import os
 from typing import Dict, List, Optional
@@ -85,7 +87,7 @@ class MT5Trader:
                 "margin_level": account_info.margin_level,
             }
         except Exception as e:
-            print(f"获取账户信息失败: {str(e)}")
+            logger.error("[空日志]", f"获取账户信息失败: {str(e)}")
             return None
 
     def get_all_positions(self) -> List[Dict]:
@@ -105,7 +107,7 @@ class MT5Trader:
 
             return [position._asdict() for position in positions]
         except Exception as e:
-            print(f"获取持仓信息出错：{str(e)}")
+            # print(f"获取持仓信息出错：{str(e)}")
             return []
 
     def get_position(self, ticket: int) -> Optional[Dict]:
@@ -233,5 +235,5 @@ class MT5Trader:
             )
             return [p._asdict() for p in positions if p.type == mt5_type]
         except Exception as e:
-            print(f"获取指定品种和方向持仓出错：{str(e)}")
+            # print(f"获取指定品种和方向持仓出错：{str(e)}")
             return []

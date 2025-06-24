@@ -139,5 +139,5 @@ def sync_closed_trades_to_excel(account_id):
 
         return False
     except Exception as e:
-        print(f"同步平仓记录出错: {str(e)}")
+        # print(f"同步平仓记录出错: {str(e)}")
         return False

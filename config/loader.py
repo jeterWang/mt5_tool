@@ -7,6 +7,9 @@
 import os
 import json
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 
 # 基础配置
 SYMBOLS = None
@@ -51,27 +54,27 @@ def get_config_path():
             # 确保目录存在
             if not os.path.exists(config_dir):
                 os.makedirs(config_dir, exist_ok=True)
-                print(f"创建打包环境的配置目录: {config_dir}")
+                # print(f"创建打包环境的配置目录: {config_dir}")
 
             # 打包后的配置文件放在可执行文件同级目录的config文件夹中
             config_path = os.path.join(config_dir, "config.json")
-            print(f"打包环境配置路径: {config_path}")
+            # print(f"打包环境配置路径: {config_path}")
 
             # 确保配置文件存在
             if not os.path.exists(config_path):
                 # 如果配置文件不存在，则需要创建一个默认配置
                 save_config()
-                print(f"在打包环境中创建了默认配置文件: {config_path}")
+                # print(f"在打包环境中创建了默认配置文件: {config_path}")
 
             return config_path
         else:
             # 如果是开发环境
             current_dir = os.path.dirname(os.path.abspath(__file__))
             config_path = os.path.join(current_dir, "config.json")
-            print(f"开发环境配置路径: {config_path}")
+            # print(f"开发环境配置路径: {config_path}")
             return config_path
     except Exception as e:
-        print(f"获取配置文件路径出错: {str(e)}")
+        # print(f"获取配置文件路径出错: {str(e)}")
         # 返回一个相对路径作为备选
         return "config/config.json"
 
@@ -90,7 +93,7 @@ def load_config():
         os.path.dirname(os.path.abspath(__file__)), "config.json"
     )
     if not os.path.exists(config_path):
-        print(
+        logger.error("[空日志]", 
             f"[配置错误] 未找到配置文件: {config_path}\n请复制config.json.example为config.json并完善配置后重试！"
         )
         sys.exit(1)
@@ -113,7 +116,7 @@ def load_config():
         ]
         for field in required_fields:
             if field not in config:
-                print(f"[配置错误] 缺少字段: {field}，请检查config.json！")
+                logger.error("[空日志]", f"[配置错误] 缺少字段: {field}，请检查config.json！")
                 sys.exit(1)
         # 赋值
         SYMBOLS = config["SYMBOLS"]
@@ -129,7 +132,7 @@ def load_config():
         BATCH_ORDER_DEFAULTS = config["BATCH_ORDER_DEFAULTS"]
         return config
     except Exception as e:
-        print(f"[配置错误] 解析config.json失败: {e}")
+        logger.error("[空日志]", f"[配置错误] 解析config.json失败: {e}")
         sys.exit(1)
 
 
@@ -146,34 +149,34 @@ def save_config():
     global BATCH_ORDER_DEFAULTS, POSITION_SIZING
 
     try:
-        print(f"save_config: 保存前SYMBOLS = {SYMBOLS}")  # 调试信息
-        print(f"save_config: 保存前DAILY_TRADE_LIMIT = {DAILY_TRADE_LIMIT}")  # 调试信息
-        print(
-            f"save_config: 保存前BATCH_ORDER_DEFAULTS = {BATCH_ORDER_DEFAULTS}"
-        )  # 调试信息
+        # print(f"save_config: 保存前SYMBOLS = {SYMBOLS}")  # 调试信息
+        # print(f"save_config: 保存前DAILY_TRADE_LIMIT = {DAILY_TRADE_LIMIT}")  # 调试信息
+        # print(
+        #     f"save_config: 保存前BATCH_ORDER_DEFAULTS = {BATCH_ORDER_DEFAULTS}"
+        # )  # 调试信息
 
         # 创建配置字典前检查批量下单设置中的关键字段
         for order_key, order_data in BATCH_ORDER_DEFAULTS.items():
             # 确保每个订单设置都包含所有必要字段
             if "volume" not in order_data:
-                print(f"save_config: {order_key}缺少volume字段，使用默认值0.1")
+                # print(f"save_config: {order_key}缺少volume字段，使用默认值0.1")
                 order_data["volume"] = 0.1
             if "sl_points" not in order_data:
-                print(f"save_config: {order_key}缺少sl_points字段，使用默认值3000")
+                # print(f"save_config: {order_key}缺少sl_points字段，使用默认值3000")
                 order_data["sl_points"] = 3000
             if "tp_points" not in order_data:
-                print(f"save_config: {order_key}缺少tp_points字段，使用默认值1000")
+                # print(f"save_config: {order_key}缺少tp_points字段，使用默认值1000")
                 order_data["tp_points"] = 1000
             if "sl_candle" not in order_data:
-                print(f"save_config: {order_key}缺少sl_candle字段，使用默认值3")
+                # print(f"save_config: {order_key}缺少sl_candle字段，使用默认值3")
                 order_data["sl_candle"] = 3
             if "fixed_loss" not in order_data:
-                print(
+                logger.info("[空日志]", "[空日志]", 
                     f"save_config: {order_key}缺少fixed_loss字段，使用默认值{POSITION_SIZING['DEFAULT_FIXED_LOSS']}"
                 )
                 order_data["fixed_loss"] = POSITION_SIZING["DEFAULT_FIXED_LOSS"]
             if "checked" not in order_data:
-                print(f"save_config: {order_key}缺少checked字段，使用默认值True")
+                # print(f"save_config: {order_key}缺少checked字段，使用默认值True")
                 order_data["checked"] = True
 
         # 使用深拷贝避免引用问题
@@ -196,16 +199,16 @@ def save_config():
         }
 
         config_path = get_config_path()
-        print(f"save_config: 尝试保存到 {config_path}")  # 调试信息
-        print(f"save_config: 配置中的DAILY_TRADE_LIMIT = {config['DAILY_TRADE_LIMIT']}")
-        print(
-            f"save_config: 配置中的BATCH_ORDER_DEFAULTS = {config['BATCH_ORDER_DEFAULTS']}"
-        )
+        # print(f"save_config: 尝试保存到 {config_path}")  # 调试信息
+        # print(f"save_config: 配置中的DAILY_TRADE_LIMIT = {config['DAILY_TRADE_LIMIT']}")
+        # print(
+        #     f"save_config: 配置中的BATCH_ORDER_DEFAULTS = {config['BATCH_ORDER_DEFAULTS']}"
+        # )
 
         # 确保config目录存在
         config_dir = os.path.dirname(config_path)
         if not os.path.exists(config_dir):
-            print(f"save_config: 创建目录 {config_dir}")
+            # print(f"save_config: 创建目录 {config_dir}")
             os.makedirs(config_dir, exist_ok=True)
 
         # 保存到临时文件，然后重命名，以减少文件损坏风险
@@ -224,25 +227,25 @@ def save_config():
                         os.remove(backup_path)
                     # 将当前配置文件重命名为备份
                     os.rename(config_path, backup_path)
-                    print(f"save_config: 创建备份文件 {backup_path}")
+                    # print(f"save_config: 创建备份文件 {backup_path}")
                 except Exception as e:
-                    print(f"save_config: 创建备份文件失败: {str(e)}")
-
+                    # print(f"save_config: 创建备份文件失败: {str(e)}")
+                    pass
             # 将临时文件重命名为正式文件
             try:
                 os.rename(temp_path, config_path)
-                print(f"save_config: 临时文件重命名为 {config_path}")
+                # print(f"save_config: 临时文件重命名为 {config_path}")
             except Exception as e:
-                print(f"save_config: 重命名临时文件失败: {str(e)}")
+                # print(f"save_config: 重命名临时文件失败: {str(e)}")
                 # 如果重命名失败，直接复制内容
                 try:
                     with open(temp_path, "r", encoding="utf-8") as src:
                         with open(config_path, "w", encoding="utf-8") as dst:
                             dst.write(src.read())
-                    print(f"save_config: 使用复制代替重命名")
+                    # print(f"save_config: 使用复制代替重命名")
                     os.remove(temp_path)
                 except Exception as copy_e:
-                    print(f"save_config: 复制文件也失败: {str(copy_e)}")
+                    # print(f"save_config: 复制文件也失败: {str(copy_e)}")
                     return False
 
         # 验证保存是否成功
@@ -250,26 +253,26 @@ def save_config():
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
                     saved_config = json.load(f)
-                    print(
-                        f"save_config: 文件中的SYMBOLS = {saved_config.get('SYMBOLS', '未找到')}"
-                    )  # 调试信息
-                    print(
-                        f"save_config: 文件中的DAILY_TRADE_LIMIT = {saved_config.get('DAILY_TRADE_LIMIT', '未找到')}"
-                    )  # 调试信息
-                    print(
-                        f"save_config: 文件中的BATCH_ORDER_DEFAULTS = {saved_config.get('BATCH_ORDER_DEFAULTS', '未找到')}"
-                    )  # 调试信息
+                    # print(
+                    #     f"save_config: 文件中的SYMBOLS = {saved_config.get('SYMBOLS', '未找到')}"
+                    # )  # 调试信息
+                    # print(
+                    #     f"save_config: 文件中的DAILY_TRADE_LIMIT = {saved_config.get('DAILY_TRADE_LIMIT', '未找到')}"
+                    # )  # 调试信息
+                    # print(
+                    #     f"save_config: 文件中的BATCH_ORDER_DEFAULTS = {saved_config.get('BATCH_ORDER_DEFAULTS', '未找到')}"
+                    # )  # 调试信息
 
                     # 验证交易限制是否正确保存
                     if saved_config.get("DAILY_TRADE_LIMIT") != DAILY_TRADE_LIMIT:
-                        print(
-                            f"save_config: 警告 - 文件中的DAILY_TRADE_LIMIT({saved_config.get('DAILY_TRADE_LIMIT')})与内存中的值({DAILY_TRADE_LIMIT})不一致!"
-                        )
+                        # print(
+                        #     f"save_config: 警告 - 文件中的DAILY_TRADE_LIMIT({saved_config.get('DAILY_TRADE_LIMIT')})与内存中的值({DAILY_TRADE_LIMIT})不一致!"
+                        # )
                         # 更新全局变量，确保内存与文件一致
                         DAILY_TRADE_LIMIT = saved_config.get("DAILY_TRADE_LIMIT")
-                        print(
-                            f"save_config: 已更新内存中的DAILY_TRADE_LIMIT为{DAILY_TRADE_LIMIT}"
-                        )
+                        # print(
+                        #     f"save_config: 已更新内存中的DAILY_TRADE_LIMIT为{DAILY_TRADE_LIMIT}"
+                        # )
 
                     # 验证批量订单设置是否正确保存
                     saved_batch = saved_config.get("BATCH_ORDER_DEFAULTS", {})
@@ -277,7 +280,7 @@ def save_config():
                         if order_key in saved_batch:
                             saved_volume = saved_batch[order_key].get("volume")
                             if saved_volume != order_data.get("volume"):
-                                print(
+                                logger.warning("[空日志]", 
                                     f"save_config: 警告 - 文件中的{order_key}手数({saved_volume})与内存中的值({order_data.get('volume')})不一致!"
                                 )
 
@@ -286,13 +289,13 @@ def save_config():
 
                     return True
             except Exception as e:
-                print(f"save_config: 验证保存失败: {str(e)}")
+                # print(f"save_config: 验证保存失败: {str(e)}")
                 return False
         else:
-            print(f"save_config: 配置文件未创建成功")
+            # print(f"save_config: 配置文件未创建成功")
             return False
     except Exception as e:
-        print(f"保存配置出错: {str(e)}")
+        # print(f"保存配置出错: {str(e)}")
         # 尝试保存到备选位置
         try:
             backup_path = os.path.join(
@@ -303,13 +306,13 @@ def save_config():
                 ),
                 "config.json",
             )
-            print(f"save_config: 尝试保存到备选位置 {backup_path}")
+            # print(f"save_config: 尝试保存到备选位置 {backup_path}")
             with open(backup_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=4, ensure_ascii=False)
-            print(f"save_config: 已保存到备选位置 {backup_path}")
+            # print(f"save_config: 已保存到备选位置 {backup_path}")
             return True
         except Exception as backup_e:
-            print(f"save_config: 备选保存也失败: {str(backup_e)}")
+            # print(f"save_config: 备选保存也失败: {str(backup_e)}")
             return False
 
 
@@ -363,9 +366,9 @@ def load_saved_config_to_memory(saved_config):
     if "POSITION_SIZING" in saved_config:
         POSITION_SIZING.update(saved_config["POSITION_SIZING"])
 
-    print("load_saved_config_to_memory: 已将文件中的配置应用到内存")
+    # print("load_saved_config_to_memory: 已将文件中的配置应用到内存")
 
 
 # 加载配置
-print("config/loader.py模块被导入，执行load_config()")
+# print("config/loader.py模块被导入，执行load_config()")
 load_config()

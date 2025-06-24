@@ -95,6 +95,7 @@ class BatchOrderSection:
     def refresh_orders_ui(self):
         # 清除原有行
         for row in self.order_rows:
+            pass
             row["widget"].setParent(None)
         self.order_rows.clear()
 
@@ -309,14 +310,14 @@ class BatchOrderSection:
 
             # 验证止损价格的合理性
             if order_type == "buy" and sl_price >= entry_price:
-                print(
-                    f"买入订单止损价格{sl_price}高于入场价格{entry_price}，无法计算仓位"
-                )
+                # print(
+                # f"买入订单止损价格{sl_price}高于入场价格{entry_price}，无法计算仓位"
+                # )
                 return 0
             elif order_type == "sell" and sl_price <= entry_price:
-                print(
-                    f"卖出订单止损价格{sl_price}低于入场价格{entry_price}，无法计算仓位"
-                )
+                # print(
+                # f"卖出订单止损价格{sl_price}低于入场价格{entry_price}，无法计算仓位"
+                # )
                 return 0
 
             # 计算价格差距（风险金额）
@@ -338,14 +339,14 @@ class BatchOrderSection:
             position_size = max(min_volume, min(max_volume, position_size))
             position_size = round(position_size / volume_step) * volume_step
 
-            print(
-                f"固定亏损计算: {order_type}单, 入场价{entry_price}, 止损价{sl_price}, 风险金额{price_diff}, 计算手数{position_size}"
-            )
+            # print(
+            # f"固定亏损计算: {order_type}单, 入场价{entry_price}, 止损价{sl_price}, 风险金额{price_diff}, 计算手数{position_size}"
+            # )
 
             return position_size
 
         except Exception as e:
-            print(f"计算仓位大小出错: {str(e)}")
+            # print(f"计算仓位大小出错: {str(e)}")
             return 0
 
     def calculate_position_size(self, order_idx):
@@ -369,7 +370,7 @@ class BatchOrderSection:
     def save_batch_settings(self):
         """实时保存批量订单设置"""
         try:
-            print("正在保存批量订单设置...")
+            # print("正在保存批量订单设置...")
             # 只保存volume>0的订单
             valid_count = 0
             for i, order in enumerate(self.orders[: self.MAX_ORDERS]):
@@ -384,13 +385,13 @@ class BatchOrderSection:
                     "fixed_loss": order["fixed_loss"],
                     "checked": order["checked"],
                 }
-                print(
-                    f"批量订单{valid_count+1}设置: 手数={order['volume']}, "
-                    f"止损点数={order['sl_points']}, "
-                    f"止盈点数={order['tp_points']}, "
-                    f"K线回溯={order['sl_candle']}, "
-                    f"固定亏损={order['fixed_loss']}"
-                )
+                # print(
+                #     f"批量订单{valid_count+1}设置: 手数={order['volume']}, "
+                #     f"止损点数={order['sl_points']}, "
+                #     f"止盈点数={order['tp_points']}, "
+                #     f"K线回溯={order['sl_candle']}, "
+                #     f"固定亏损={order['fixed_loss']}"
+                # )
                 valid_count += 1
             # 清理多余的orderN
             for i in range(valid_count + 1, self.MAX_ORDERS + 1):
@@ -399,7 +400,7 @@ class BatchOrderSection:
             # 保存配置到文件
             result = save_config()
             if result:
-                print("批量订单设置已成功保存")
+                # print("批量订单设置已成功保存")
                 from config.loader import (
                     load_config,
                     BATCH_ORDER_DEFAULTS as updated_defaults,
@@ -413,23 +414,25 @@ class BatchOrderSection:
                     expected_volume = self.orders[i]["volume"]
                     actual_volume = updated_defaults[order_key].get("volume")
                     if abs(expected_volume - actual_volume) > 0.001:
-                        print(
-                            f"警告: {order_key}手数值不一致, UI:{expected_volume}, 内存:{actual_volume}"
-                        )
+                        # print(
+                        #     f"警告: {order_key}手数值不一致, UI:{expected_volume}, 内存:{actual_volume}"
+                        # )
                         self.orders[i]["volume"] = actual_volume
                     else:
-                        print(f"{order_key}手数保存成功: {actual_volume}")
+                        # print(f"{order_key}手数保存成功: {actual_volume}")
+                        pass
 
                     # 验证fixed_loss字段
                     expected_fixed_loss = self.orders[i]["fixed_loss"]
                     actual_fixed_loss = updated_defaults[order_key].get("fixed_loss")
                     if abs(expected_fixed_loss - actual_fixed_loss) > 0.001:
-                        print(
-                            f"警告: {order_key}固定亏损值不一致, UI:{expected_fixed_loss}, 内存:{actual_fixed_loss}"
-                        )
+                        # print(
+                        #     f"警告: {order_key}固定亏损值不一致, UI:{expected_fixed_loss}, 内存:{actual_fixed_loss}"
+                        # )
                         self.orders[i]["fixed_loss"] = actual_fixed_loss
                     else:
-                        print(f"{order_key}固定亏损保存成功: {actual_fixed_loss}")
+                        # print(f"{order_key}固定亏损保存成功: {actual_fixed_loss}")
+                        pass
 
                     # 验证其他关键字段
                     self.orders[i]["sl_points"] = updated_defaults[order_key].get(
@@ -445,10 +448,11 @@ class BatchOrderSection:
                         "checked", self.orders[i]["checked"]
                     )
             else:
-                print("批量订单设置保存失败")
+                pass
+                # print("批量订单设置保存失败")
             return result
         except Exception as e:
-            print(f"保存批量订单设置失败: {e}")
+            # print(f"保存批量订单设置失败: {e}")
             return False
 
     def update_sl_mode(self, mode):

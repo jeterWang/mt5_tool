@@ -5,6 +5,17 @@ MT5交易系统启动入口
 """
 
 import sys
+import logging
+logger = logging.getLogger(__name__)
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+    ]
+)
 from PyQt6.QtWidgets import QApplication
 from app.gui import MT5GUI
 
@@ -14,9 +25,9 @@ def main():
     # 确保正确加载配置
     from config.loader import load_config, SYMBOLS
 
-    print(f"程序启动前SYMBOLS = {SYMBOLS}")
+    logger.info(f"程序启动前SYMBOLS = {SYMBOLS}")
     load_config()
-    print(f"程序启动后SYMBOLS = {SYMBOLS}")
+    logger.info(f"程序启动后SYMBOLS = {SYMBOLS}")
 
     app = QApplication(sys.argv)
     window = MT5GUI()

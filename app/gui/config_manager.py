@@ -23,7 +23,7 @@ def save_gui_config(gui_window):
         bool: 保存是否成功
     """
     try:
-        print("正在保存GUI配置...")
+        # print("正在保存GUI配置...")
 
         # 更新声音提醒设置
         countdown = gui_window.components["countdown"]
@@ -32,9 +32,9 @@ def save_gui_config(gui_window):
 
         # 保存一键保本偏移点数设置
         if "BREAKEVEN_OFFSET_POINTS" in GUI_SETTINGS:
-            print(
-                f"当前一键保本偏移点数设置为: {GUI_SETTINGS['BREAKEVEN_OFFSET_POINTS']}"
-            )
+            # print(
+            # f"当前一键保本偏移点数设置为: {GUI_SETTINGS['BREAKEVEN_OFFSET_POINTS']}"
+            # )
 
         # 更新止损模式设置
         trading_settings = gui_window.components["trading_settings"]
@@ -45,7 +45,7 @@ def save_gui_config(gui_window):
         )
 
         # 打印保存前的批量下单设置
-        print(f"保存前BATCH_ORDER_DEFAULTS: {BATCH_ORDER_DEFAULTS}")
+        # print(f"保存前BATCH_ORDER_DEFAULTS: {BATCH_ORDER_DEFAULTS}")
 
         # 更新批量下单默认值
         batch_order = gui_window.components["batch_order"]
@@ -63,14 +63,14 @@ def save_gui_config(gui_window):
         # 更新K线关键位止损默认K线回溯数量
         if SL_MODE["DEFAULT_MODE"] == "CANDLE_KEY_LEVEL" and batch_order.orders:
             SL_MODE["CANDLE_LOOKBACK"] = batch_order.orders[0]["sl_candle"]
-            print(f"设置K线回溯数量: {SL_MODE['CANDLE_LOOKBACK']}")
+            # print(f"设置K线回溯数量: {SL_MODE['CANDLE_LOOKBACK']}")
 
         # 打印保存后的批量下单设置
-        print(f"保存后BATCH_ORDER_DEFAULTS: {BATCH_ORDER_DEFAULTS}")
+        # print(f"保存后BATCH_ORDER_DEFAULTS: {BATCH_ORDER_DEFAULTS}")
 
         # 保存配置
         result = save_config()
-        print(f"配置保存结果: {result}")
+        # print(f"配置保存结果: {result}")
 
         # 更新交易次数显示，确保UI显示是最新的
         if gui_window.db:
@@ -79,5 +79,5 @@ def save_gui_config(gui_window):
 
         return result
     except Exception as e:
-        print(f"保存配置出错: {e}")
+        # print(f"保存配置出错: {e}")
         return False
