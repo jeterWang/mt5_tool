@@ -7,8 +7,8 @@
     "DEFAULT_TIMEFRAME": "M1",
     "Delta_TIMEZONE": 0,
     "TRADING_DAY_RESET_HOUR": 20,
-    "DAILY_LOSS_LIMIT": 80.0,
-    "DAILY_TRADE_LIMIT": 20,
+    "DAILY_LOSS_LIMIT": 100.0,
+    "DAILY_TRADE_LIMIT": 10,
     "GUI_SETTINGS": {
         "WINDOW_TOP": true,
         "SOUND_ALERT": true,
