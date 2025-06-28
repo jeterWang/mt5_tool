@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import winsound
 import json
 import sqlite3
+from sqlalchemy import func
 
 from utils.paths import get_data_path
 from config.loader import (
@@ -19,6 +20,8 @@ from config.loader import (
     GUI_SETTINGS,
     get_config_path,
 )
+from app.database import TradeDatabase
+from app.orm_models import TradeHistory
 
 
 def check_trade_limit(db, gui_window):
@@ -65,7 +68,7 @@ def check_trade_limit(db, gui_window):
         # print(f"检查交易次数限制，当前设置为: {limit_to_use}")
 
         # 获取今日实际交易次数
-        count = db.get_today_count()
+        count = db.get_today_count_merged()
         # print(f"今日已交易次数: {count}, 最大允许次数: {limit_to_use}")
 
         if count >= limit_to_use:
@@ -95,41 +98,36 @@ def check_daily_loss_limit(trader, db, gui_window):
         bool: 是否允许继续交易
     """
     try:
-        # 1. 统计今日已实现亏损（改为trade_history表SQL查询）
+        # 1. 统计今日已实现亏损（ORM查询trade_history表）
         today = get_trading_day()
         realized_loss = 0
         account_id = trader._get_account_id() if trader else "unknown"
-        db_path = get_data_path("trade_history.db")
         try:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT SUM(profit) FROM trade_history WHERE trading_day = ? AND account = ?
-                """,
-                (today, str(account_id)),
-            )
-            result = cursor.fetchone()
-            if result and result[0] is not None:
-                realized_loss = result[0]
-            conn.close()
+            db_obj = TradeDatabase()
+            with db_obj.Session() as session:
+                result = (
+                    session.query(func.sum(TradeHistory.profit))
+                    .filter(
+                        TradeHistory.trading_day == today,
+                        TradeHistory.account == str(account_id),
+                    )
+                    .scalar()
+                )
+                if result is not None:
+                    realized_loss = result
         except Exception as e:
             pass
-
         # 2. 统计当前未实现浮动盈亏
         unrealized = 0
         if trader and trader.is_connected():
             positions = trader.get_all_positions()
             if positions:
                 unrealized = sum([p["profit"] for p in positions])
-
         # 3. 合计
         total = realized_loss + unrealized
         if total <= -DAILY_LOSS_LIMIT:
-            # 超过最大亏损，自动平仓并禁止交易
             gui_window.components["trading_buttons"].close_all_positions()
             gui_window.disable_trading_for_today()
-            # 记录风控事件
             detail = f"日内亏损已达{total:.2f}，已自动平仓并禁止交易"
             db.record_risk_event("DAILY_LOSS_LIMIT", detail)
             gui_window.status_bar.showMessage(detail)

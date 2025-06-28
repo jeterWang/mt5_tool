@@ -67,8 +67,8 @@ class AccountInfoSection:
         Args:
             db: 数据库对象
         """
-        # 获取今日实际交易次数
-        count = db.get_today_count()
+        # 获取今日实际交易次数（10秒内合并为一笔）
+        count = db.get_today_count_merged()
         # 计算剩余交易次数
         daily_limit = config_manager.get("DAILY_TRADE_LIMIT")
         remaining = max(0, daily_limit - count)

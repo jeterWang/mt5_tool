@@ -13,6 +13,9 @@ import sqlite3
 
 from utils.paths import get_data_path
 from config.loader import Delta_TIMEZONE, TRADING_DAY_RESET_HOUR
+from app.database import TradeDatabase
+from app.orm_models import TradeHistory
+from sqlalchemy.orm import Session
 
 
 def get_trading_day_from_datetime(dt):
@@ -37,25 +40,28 @@ def get_db_close_time_range(account_id, db_path=None):
     """
     查询数据库中该账户的最早和最晚close_time，返回(datetime_min, datetime_max)
     """
-    if db_path is None:
-        db_path = get_data_path("trade_history.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT MIN(close_time), MAX(close_time) FROM trade_history WHERE account=?",
-        (str(account_id),),
-    )
-    result = cursor.fetchone()
-    conn.close()
-    min_time, max_time = result if result else (None, None)
+    db = TradeDatabase()
+    with db.Session() as session:
+        min_time = (
+            session.query(TradeHistory)
+            .filter_by(account=str(account_id))
+            .order_by(TradeHistory.close_time.asc())
+            .first()
+        )
+        max_time = (
+            session.query(TradeHistory)
+            .filter_by(account=str(account_id))
+            .order_by(TradeHistory.close_time.desc())
+            .first()
+        )
 
-    def parse_time(s):
-        try:
-            return datetime.strptime(s, "%Y-%m-%d %H:%M:%S") if s else None
-        except Exception:
-            return None
+        def parse_time(obj):
+            try:
+                return obj.close_time if obj else None
+            except Exception:
+                return None
 
-    return parse_time(min_time), parse_time(max_time)
+        return parse_time(min_time), parse_time(max_time)
 
 
 def sync_closed_trades_to_db(account_id, db_path=None, days=365, batch_days=30):
@@ -69,12 +75,11 @@ def sync_closed_trades_to_db(account_id, db_path=None, days=365, batch_days=30):
     Returns:
         是否有新平仓记录
     """
-    if db_path is None:
-        db_path = get_data_path("trade_history.db")
+    db = TradeDatabase()
     now = datetime.now()
     start_time = now - timedelta(days=days)
     end_time = now
-    db_min, db_max = get_db_close_time_range(account_id, db_path)
+    db_min, db_max = get_db_close_time_range(account_id)
     # 只同步缺失区间
     sync_ranges = []
     if db_min is None or db_min > start_time:
@@ -94,66 +99,63 @@ def sync_closed_trades_to_db(account_id, db_path=None, days=365, batch_days=30):
             if deals is None:
                 batch_start = batch_end
                 continue
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT order_id FROM trade_history WHERE account=?", (str(account_id),)
-            )
-            recorded_order_ids = set(str(row[0]) for row in cursor.fetchall())
-            new_records = []
-            tz_delta = Delta_TIMEZONE
-            for deal in deals:
-                if deal.entry != mt5.DEAL_ENTRY_OUT:
-                    continue
-                order_id = str(deal.position_id)
-                if order_id in recorded_order_ids:
-                    continue
-                open_deal = None
-                for d in deals:
-                    if (
-                        hasattr(d, "position_id")
-                        and d.position_id == deal.position_id
-                        and d.entry == mt5.DEAL_ENTRY_IN
-                    ):
-                        open_deal = d
-                        break
-                open_time = (
-                    datetime.fromtimestamp(open_deal.time + tz_delta * 3600)
-                    if open_deal
-                    else ""
+            # ORM唯一性去重
+            with db.Session() as session:
+                recorded_order_ids = set(
+                    r[0]
+                    for r in session.query(TradeHistory.order_id)
+                    .filter_by(account=str(account_id))
+                    .all()
                 )
-                open_price = open_deal.price if open_deal else ""
-                close_time = datetime.fromtimestamp(deal.time + tz_delta * 3600)
-                trading_day = get_trading_day_from_datetime(close_time)
-                close_price = deal.price
-                profit = deal.profit
-                direction = "buy" if deal.type == mt5.ORDER_TYPE_BUY else "sell"
-                close_info = (
-                    order_id,
-                    str(account_id),
-                    deal.symbol,
-                    deal.volume,
-                    direction,
-                    open_time.strftime("%Y-%m-%d %H:%M:%S") if open_time else "",
-                    close_time.strftime("%Y-%m-%d %H:%M:%S"),
-                    trading_day,
-                    open_price,
-                    close_price,
-                    profit,
-                    deal.comment,
-                )
-                new_records.append(close_info)
-            if new_records:
-                cursor.executemany(
-                    """
-                    INSERT OR IGNORE INTO trade_history (
-                        order_id, account, symbol, volume, direction, open_time, close_time, trading_day, open_price, close_price, profit, comment
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    new_records,
-                )
-                conn.commit()
-                has_new = True
-            conn.close()
+                new_records = []
+                tz_delta = Delta_TIMEZONE
+                for deal in deals:
+                    if deal.entry != mt5.DEAL_ENTRY_OUT:
+                        continue
+                    order_id = str(deal.position_id)
+                    if order_id in recorded_order_ids:
+                        continue
+                    open_deal = None
+                    for d in deals:
+                        if (
+                            hasattr(d, "position_id")
+                            and d.position_id == deal.position_id
+                            and d.entry == mt5.DEAL_ENTRY_IN
+                        ):
+                            open_deal = d
+                            break
+                    open_time = (
+                        datetime.fromtimestamp(open_deal.time + tz_delta * 3600)
+                        if open_deal
+                        else None
+                    )
+                    open_price = open_deal.price if open_deal else None
+                    close_time = datetime.fromtimestamp(deal.time + tz_delta * 3600)
+                    trading_day = get_trading_day_from_datetime(close_time)
+                    close_price = deal.price
+                    profit = deal.profit
+                    direction = "buy" if deal.type == mt5.ORDER_TYPE_BUY else "sell"
+                    close_info = TradeHistory(
+                        order_id=order_id,
+                        account=str(account_id),
+                        symbol=deal.symbol,
+                        volume=deal.volume,
+                        direction=direction,
+                        open_time=open_time,
+                        close_time=close_time,
+                        trading_day=trading_day,
+                        open_price=open_price,
+                        close_price=close_price,
+                        profit=profit,
+                        comment=deal.comment,
+                    )
+                    new_records.append(close_info)
+                if new_records:
+                    try:
+                        session.bulk_save_objects(new_records, return_defaults=False)
+                        session.commit()
+                        has_new = True
+                    except Exception as e:
+                        session.rollback()
             batch_start = batch_end
     return has_new

@@ -11,6 +11,9 @@ import sqlite3
 
 from utils.paths import get_data_path
 from config.loader import DAILY_LOSS_LIMIT
+from app.database import TradeDatabase
+from app.orm_models import TradeHistory
+from sqlalchemy import func
 
 
 class PnlInfoSection:
@@ -41,22 +44,21 @@ class PnlInfoSection:
             trading_day = trader.get_trading_day()
             # 获取账户ID
             account_id = trader._get_account_id()
-            # 读取已实现盈亏（改为trade_history表SQL查询）
-            db_path = get_data_path("trade_history.db")
+            # 读取已实现盈亏（ORM查询trade_history表）
             realized_pnl = 0
             try:
-                conn = sqlite3.connect(db_path)
-                cursor = conn.cursor()
-                cursor.execute(
-                    """
-                    SELECT SUM(profit) FROM trade_history WHERE trading_day = ? AND account = ?
-                    """,
-                    (trading_day, str(account_id)),
-                )
-                result = cursor.fetchone()
-                if result and result[0] is not None:
-                    realized_pnl = result[0]
-                conn.close()
+                db = TradeDatabase()
+                with db.Session() as session:
+                    result = (
+                        session.query(func.sum(TradeHistory.profit))
+                        .filter(
+                            TradeHistory.trading_day == trading_day,
+                            TradeHistory.account == str(account_id),
+                        )
+                        .scalar()
+                    )
+                    if result is not None:
+                        realized_pnl = result
             except Exception as e:
                 realized_pnl = 0
             # 获取浮动盈亏
