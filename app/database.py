@@ -6,6 +6,7 @@
 
 import sqlite3
 import logging
+
 logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta
 import os
@@ -55,6 +56,38 @@ class TradeDatabase:
             """
             )
 
+            # 创建历史订单明细表
+            cursor.execute(
+                """
+            CREATE TABLE IF NOT EXISTS trade_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id TEXT UNIQUE,
+                account TEXT,
+                symbol TEXT,
+                volume REAL,
+                direction TEXT,
+                open_time TEXT,
+                close_time TEXT,
+                trading_day TEXT,
+                open_price REAL,
+                close_price REAL,
+                profit REAL,
+                comment TEXT
+            )
+            """
+            )
+
+            # 创建索引
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_trade_history_order_id ON trade_history(order_id)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_trade_history_close_time ON trade_history(close_time)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_trade_history_trading_day ON trade_history(trading_day)"
+            )
+
             self.conn.commit()
             # print("数据库表创建成功")
 
@@ -88,13 +121,13 @@ class TradeDatabase:
         """获取今日交易次数"""
         today = self.get_trading_day()
         try:
-        # print(f"正在获取今日({today})交易次数，数据库路径: {self.db_path}")
+            # print(f"正在获取今日({today})交易次数，数据库路径: {self.db_path}")
             self.conn = sqlite3.connect(self.db_path)
             cursor = self.conn.cursor()
             cursor.execute("SELECT count FROM trade_count WHERE date = ?", (today,))
             result = cursor.fetchone()
             if result:
-        # print(f"数据库中今日交易次数: {result[0]}")
+                # print(f"数据库中今日交易次数: {result[0]}")
                 return result[0]
             # print("数据库中今日无交易记录")
             return 0

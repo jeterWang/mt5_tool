@@ -21,9 +21,9 @@ class CloseAllPositionsCommand(BaseCommand):
             if success_count == len(positions):
                 show_status_message(self.gui_window, "所有订单平仓成功！")
                 try:
-                    self.trader.sync_closed_trades_to_excel()
+                    self.trader.sync_closed_trades_to_db()
                 except Exception as e:
-                    logging.error(f"同步平仓记录到Excel失败: {str(e)}")
+                    logging.error(f"同步平仓记录到数据库失败: {str(e)}")
                 try:
                     if self.gui_window.db.auto_update_trade_count_from_xlsx(
                         self.trader

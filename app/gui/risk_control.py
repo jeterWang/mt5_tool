@@ -9,6 +9,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import winsound
 import json
+import sqlite3
 
 from utils.paths import get_data_path
 from config.loader import (
@@ -94,27 +95,26 @@ def check_daily_loss_limit(trader, db, gui_window):
         bool: 是否允许继续交易
     """
     try:
-        # 1. 统计今日已实现亏损（从trade_records.xlsx）
+        # 1. 统计今日已实现亏损（改为trade_history表SQL查询）
         today = get_trading_day()
         realized_loss = 0
-        data_dir = get_data_path()
-        file_path = os.path.join(data_dir, "trade_records.xlsx")
         account_id = trader._get_account_id() if trader else "unknown"
-
-        if os.path.exists(file_path):
-            try:
-                df = pd.read_excel(file_path, sheet_name=str(account_id))
-                # 优先使用trading_day字段，如果没有再使用close_time
-                if "trading_day" in df.columns and "profit" in df.columns:
-                    df_today = df[df["trading_day"] == today]
-                    realized_loss = df_today["profit"].sum()
-                elif "close_time" in df.columns and "profit" in df.columns:
-                    # 兼容旧数据格式
-                    df_today = df[df["close_time"].astype(str).str.startswith(today)]
-                    realized_loss = df_today["profit"].sum()
-            except Exception as e:
-                # print(f"读取已实现盈亏数据出错: {str(e)}")
-                pass
+        db_path = get_data_path("trade_history.db")
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT SUM(profit) FROM trade_history WHERE trading_day = ? AND account = ?
+                """,
+                (today, str(account_id)),
+            )
+            result = cursor.fetchone()
+            if result and result[0] is not None:
+                realized_loss = result[0]
+            conn.close()
+        except Exception as e:
+            pass
 
         # 2. 统计当前未实现浮动盈亏
         unrealized = 0
@@ -136,7 +136,6 @@ def check_daily_loss_limit(trader, db, gui_window):
             return False
         return True
     except Exception as e:
-        # print(f"风控检查出错：{str(e)}")
         return True  # 出错时允许继续交易，避免错误阻止用户交易
 
 

@@ -27,7 +27,7 @@ from app.trader.orders import (
     close_position,
 )
 from app.trader.orders import cancel_order, modify_position_sl_tp
-from app.trader.data_sync import sync_closed_trades_to_excel
+from app.trader.data_sync import sync_closed_trades_to_db
 
 
 class MT5Trader:
@@ -200,8 +200,8 @@ class MT5Trader:
 
     # 数据同步方法
     def sync_closed_trades_to_excel(self):
-        """同步平仓交易到Excel"""
-        return sync_closed_trades_to_excel(self._get_account_id())
+        """同步平仓交易到数据库"""
+        return sync_closed_trades_to_db(self._get_account_id())
 
     # 交易品种信息方法
     def get_symbol_params(self, symbol: str) -> Dict:
