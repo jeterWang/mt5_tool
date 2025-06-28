@@ -220,9 +220,9 @@ class MT5Controller:
             return False
 
         try:
-            self.trader.sync_closed_trades_to_excel()
-            self._emit_event("trades_synced", {})
-            logger.info("[空日志]", "[空日志]", "交易同步完成")
+            # self.trader.sync_closed_trades_to_excel()
+            # self._emit_event("trades_synced", {})
+            # logger.info("[空日志]", "[空日志]", "交易同步完成")
             return True
         except Exception as e:
             logger.error("[空日志]", f"交易同步失败: {e}")

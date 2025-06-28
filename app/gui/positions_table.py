@@ -117,6 +117,11 @@ class PositionsTableSection:
         try:
             if trader.close_position(ticket):
                 gui_window.status_bar.showMessage(f"订单 {ticket} 平仓成功！")
+                try:
+                    trader.sync_closed_trades_to_db()
+                    gui_window.status_bar.showMessage("交易历史已同步", 2000)
+                except Exception as e:
+                    gui_window.status_bar.showMessage(f"数据库同步失败: {str(e)}")
             else:
                 gui_window.status_bar.showMessage(f"订单 {ticket} 平仓失败！")
         except Exception as e:
@@ -129,6 +134,11 @@ class PositionsTableSection:
         try:
             if trader.cancel_order(ticket):
                 gui_window.status_bar.showMessage(f"挂单 {ticket} 撤销成功！")
+                try:
+                    trader.sync_closed_trades_to_db()
+                    gui_window.status_bar.showMessage("交易历史已同步", 2000)
+                except Exception as e:
+                    gui_window.status_bar.showMessage(f"数据库同步失败: {str(e)}")
             else:
                 gui_window.status_bar.showMessage(f"挂单 {ticket} 撤销失败！")
         except Exception as e:

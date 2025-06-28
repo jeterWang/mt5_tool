@@ -60,15 +60,16 @@ class AccountInfoSection:
                 f"保证金水平: {account_info['margin_level']:.2f}%"
             )
 
-    def update_trade_count_display(self, db):
+    def update_trade_count_display(self, db, current_account=None):
         """
         更新交易次数显示
 
         Args:
             db: 数据库对象
+            current_account: 当前账号（可为None，表示全部）
         """
         # 获取今日实际交易次数（10秒内合并为一笔）
-        count = db.get_today_count_merged()
+        count = db.get_today_count_merged(account_id=current_account)
         # 计算剩余交易次数
         daily_limit = config_manager.get("DAILY_TRADE_LIMIT")
         remaining = max(0, daily_limit - count)

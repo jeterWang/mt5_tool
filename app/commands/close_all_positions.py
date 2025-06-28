@@ -25,14 +25,6 @@ class CloseAllPositionsCommand(BaseCommand):
                 except Exception as e:
                     logging.error(f"同步平仓记录到数据库失败: {str(e)}")
                 try:
-                    if self.gui_window.db.auto_update_trade_count_from_xlsx(
-                        self.trader
-                    ):
-                        account_info = self.gui_window.components["account_info"]
-                        account_info.update_trade_count_display(self.gui_window.db)
-                except Exception as e:
-                    logging.error(f"更新交易次数统计失败: {str(e)}")
-                try:
                     pnl_info = self.gui_window.components["pnl_info"]
                     pnl_info.update_daily_pnl_info(self.trader)
                 except Exception as e:

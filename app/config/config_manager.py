@@ -96,6 +96,19 @@ class ConfigManager:
             dict,
         )
         self.register("CANDLE_LOOKBACK", 3, int)
+        self.register(
+            "STATISTICS_SETTINGS",
+            {
+                "start_date": "2000-01-01",
+                "end_date": "2025-12-31",
+                "account": "",
+                "symbol": "",
+                "day_target": 0.3,
+                "week_target": 0.5,
+                "month_target": 0.6,
+            },
+            dict,
+        )
         self._load()
 
     def _default_config_path(self):
@@ -143,6 +156,13 @@ class ConfigManager:
 
     def all(self):
         return dict(self._data)
+
+    def get_statistics_settings(self):
+        return self.get("STATISTICS_SETTINGS")
+
+    def set_statistics_settings(self, settings: dict):
+        self.set("STATISTICS_SETTINGS", settings)
+        self.save()
 
 
 # 单例实例

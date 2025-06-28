@@ -6,6 +6,7 @@ MT5订单操作模块
 
 import MetaTrader5 as mt5
 import logging
+
 logger = logging.getLogger(__name__)
 from typing import Dict, List, Optional, Union
 
@@ -397,8 +398,10 @@ def place_pending_order(
 
         # 发送订单
         result = mt5.order_send(request)
-        if result.retcode != mt5.TRADE_RETCODE_DONE:
-            logger.error("[空日志]", f"挂单失败，错误代码：{result.retcode}，描述：{result.comment}")
+        if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+            logger.error(
+                f"[空日志] 挂单失败，错误代码：{result.retcode}，描述：{result.comment}"
+            )
             return None
 
         return result.order
@@ -486,7 +489,10 @@ def place_order_with_key_level_sl(
         # 发送订单
         result = mt5.order_send(request)
         if result.retcode != mt5.TRADE_RETCODE_DONE:
-            logger.error("[空日志]", f"下单失败，错误代码：{result.retcode}，描述：{result.comment}")
+            logger.error(
+                "[空日志]",
+                f"下单失败，错误代码：{result.retcode}，描述：{result.comment}",
+            )
             return None
 
         return result.order

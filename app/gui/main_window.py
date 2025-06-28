@@ -43,6 +43,7 @@ from app.gui.trading_buttons import TradingButtonsSection
 from app.gui.positions_table import PositionsTableSection
 from app.gui.settings import show_settings_dialog
 from app.config.config_manager import config_manager
+from app.gui.statistics import StatisticsDialog
 
 
 # 全局引用，供其他模块使用
@@ -160,6 +161,13 @@ class MT5GUI(QMainWindow):
         system_settings_action.triggered.connect(self.open_settings)
         settings_menu.addAction(system_settings_action)
 
+        # 统计菜单
+        statistics_menu = QMenu("统计(&T)", self)
+        menu_bar.addMenu(statistics_menu)
+        winrate_action = QAction("盈利率统计", self)
+        winrate_action.triggered.connect(self.open_statistics_dialog)
+        statistics_menu.addAction(winrate_action)
+
         # 帮助菜单
         help_menu = QMenu("帮助(&H)", self)
         menu_bar.addMenu(help_menu)
@@ -263,10 +271,10 @@ class MT5GUI(QMainWindow):
         self.account_timer.timeout.connect(self.update_account_info)
         self.account_timer.start(5000)  # 每5秒更新一次账户信息
 
-        # 每分钟自动同步所有平仓单到excel
-        self.closed_trade_timer = QTimer()
-        self.closed_trade_timer.timeout.connect(self.sync_closed_trades)
-        self.closed_trade_timer.start(5000)  # 每5秒执行一次
+        # 新增：自动同步交易历史到数据库（每30秒）
+        self.db_trade_sync_timer = QTimer()
+        self.db_trade_sync_timer.timeout.connect(self.auto_sync_trade_history_to_db)
+        self.db_trade_sync_timer.start(30000)  # 每30秒执行一次
 
         # 新增盈亏信息定时器
         self.pnl_timer = QTimer()
@@ -420,22 +428,37 @@ class MT5GUI(QMainWindow):
         self.show()  # 重新显示窗口以应用新的窗口标志
 
     def update_account_info(self):
-        """更新账户信息"""
+        """
+        更新账户信息
+        """
         if not self.trader or not self.trader.is_connected():
             return
 
         account_info = self.components["account_info"]
         account_info.update_account_info(self.trader)
-        account_info.update_trade_count_display(self.db)
+        # 获取当前账号
+        try:
+            current_account = (
+                self.trader._get_account_id()
+                if self.trader and self.trader.is_connected()
+                else None
+            )
+        except Exception:
+            current_account = None
+        account_info.update_trade_count_display(
+            self.db, current_account=current_account
+        )
 
-    def sync_closed_trades(self):
-        """同步平仓交易到Excel"""
+    def auto_sync_trade_history_to_db(self):
+        """自动同步交易历史到数据库"""
         if self.trader and self.trader.is_connected():
             try:
-                self.trader.sync_closed_trades_to_excel()
+                has_new = self.trader.sync_closed_trades_to_db()
+                if has_new:
+                    self.status_bar.showMessage("交易历史已自动同步", 2000)
             except Exception as e:
-                pass
-                # print(f"同步平仓单到excel出错: {str(e)}")
+                logger.error("[自动同步] 交易历史同步失败: %s", str(e))
+                # 可选：self.status_bar.showMessage("交易历史同步失败", 2000)
 
     def update_daily_pnl_info(self):
         """实时刷新盈亏信息"""
@@ -595,3 +618,7 @@ class MT5GUI(QMainWindow):
         except Exception as e:
             pass
             # print(f"自动更新交易次数出错: {str(e)}")
+
+    def open_statistics_dialog(self):
+        dlg = StatisticsDialog(self)
+        dlg.exec()

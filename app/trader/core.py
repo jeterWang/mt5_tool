@@ -198,11 +198,6 @@ class MT5Trader:
         """修改持仓的止损止盈"""
         return modify_position_sl_tp(ticket, sl, tp)
 
-    # 数据同步方法
-    def sync_closed_trades_to_excel(self):
-        """同步平仓交易到数据库"""
-        return sync_closed_trades_to_db(self._get_account_id())
-
     # 交易品种信息方法
     def get_symbol_params(self, symbol: str) -> Dict:
         """获取交易品种参数"""
@@ -268,3 +263,21 @@ class MT5Trader:
             return result
         except Exception as e:
             return []
+
+    def sync_closed_trades_to_db(self, days=365, batch_days=30):
+        """
+        自动同步当前账号的平仓单到数据库
+        Args:
+            days: 目标同步天数（默认一年）
+            batch_days: 每批拉取天数（默认30天）
+        Returns:
+            是否有新平仓记录
+        """
+        account_id = self._get_account_id()
+        try:
+            return sync_closed_trades_to_db(
+                account_id, days=days, batch_days=batch_days
+            )
+        except Exception as e:
+            logger.error("[自动同步] 交易历史同步到数据库失败: %s", str(e))
+            return False
