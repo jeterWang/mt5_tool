@@ -27,6 +27,7 @@ from app.commands.cancel_all_pending_orders import CancelAllPendingOrdersCommand
 from app.commands.close_all_positions import CloseAllPositionsCommand
 from app.commands.breakeven_all_positions import BreakevenAllPositionsCommand
 from app.commands.move_stoploss_to_candle import MoveStoplossToCandleCommand
+from app.controllers.trading_buttons_controller import TradingButtonsController
 
 
 class TradingButtonsSection:
@@ -39,6 +40,7 @@ class TradingButtonsSection:
         self.connect_signals()
         self.trader = None
         self.gui_window = None
+        self.controller = None  # 控制器实例
 
     def init_ui(self):
         """初始化UI"""
@@ -240,57 +242,32 @@ class TradingButtonsSection:
 
     def connect_signals(self):
         """连接信号到对应的槽函数"""
-        self.place_batch_buy_btn.clicked.connect(
-            lambda: PlaceBatchOrderCommand(
-                self.trader, self.gui_window, "buy"
-            ).execute()
-        )
+        self.place_batch_buy_btn.clicked.connect(lambda: self.controller.on_batch_buy())
         self.place_batch_sell_btn.clicked.connect(
-            lambda: PlaceBatchOrderCommand(
-                self.trader, self.gui_window, "sell"
-            ).execute()
+            lambda: self.controller.on_batch_sell()
         )
         self.place_breakout_high_btn.clicked.connect(
-            lambda: PlaceBreakoutOrderCommand(
-                self.trader, self.gui_window, "high"
-            ).execute()
+            lambda: self.controller.on_breakout_high()
         )
         self.place_breakout_low_btn.clicked.connect(
-            lambda: PlaceBreakoutOrderCommand(
-                self.trader, self.gui_window, "low"
-            ).execute()
+            lambda: self.controller.on_breakout_low()
         )
         self.cancel_all_pending_btn.clicked.connect(
-            lambda: CancelAllPendingOrdersCommand(
-                self.trader, self.gui_window
-            ).execute()
+            lambda: self.controller.on_cancel_all_pending()
         )
         self.breakeven_all_btn.clicked.connect(
-            lambda: BreakevenAllPositionsCommand(self.trader, self.gui_window).execute()
+            lambda: self.controller.on_breakeven_all()
         )
-        self.close_all_btn.clicked.connect(
-            lambda: CloseAllPositionsCommand(self.trader, self.gui_window).execute()
-        )
-        self.move_sl_1_btn.clicked.connect(
-            lambda: MoveStoplossToCandleCommand(
-                self.trader, self.gui_window, 1
-            ).execute()
-        )
-        self.move_sl_2_btn.clicked.connect(
-            lambda: MoveStoplossToCandleCommand(
-                self.trader, self.gui_window, 2
-            ).execute()
-        )
-        self.move_sl_3_btn.clicked.connect(
-            lambda: MoveStoplossToCandleCommand(
-                self.trader, self.gui_window, 3
-            ).execute()
-        )
+        self.close_all_btn.clicked.connect(lambda: self.controller.on_close_all())
+        self.move_sl_1_btn.clicked.connect(lambda: self.controller.on_move_sl_1())
+        self.move_sl_2_btn.clicked.connect(lambda: self.controller.on_move_sl_2())
+        self.move_sl_3_btn.clicked.connect(lambda: self.controller.on_move_sl_3())
 
     def set_trader_and_window(self, trader, gui_window):
         """设置交易者和主窗口引用"""
         self.trader = trader
         self.gui_window = gui_window
+        self.controller = TradingButtonsController(trader, gui_window)
 
         # 在设置完trader引用后，如果已连接就启用按钮
         if self.trader and self.trader.is_connected():

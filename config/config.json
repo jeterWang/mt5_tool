@@ -30,7 +30,7 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "fixed_loss": 7.0,
+            "fixed_loss": 3.0,
             "checked": true
         },
         "order2": {
