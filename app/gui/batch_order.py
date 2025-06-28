@@ -74,7 +74,7 @@ class BatchOrderSection:
                         "tp_points", 0
                     ),
                     "sl_candle": config_manager.get("BATCH_ORDER_DEFAULTS")[key].get(
-                        "sl_candle", config_manager.get("SL_MODE")["CANDLE_LOOKBACK"]
+                        "sl_candle", config_manager.get("CANDLE_LOOKBACK", 3)
                     ),
                     "fixed_loss": config_manager.get("BATCH_ORDER_DEFAULTS")[key].get(
                         "fixed_loss",
@@ -92,7 +92,7 @@ class BatchOrderSection:
                     "volume": 0.01,
                     "sl_points": 0,
                     "tp_points": 0,
-                    "sl_candle": config_manager.get("SL_MODE")["CANDLE_LOOKBACK"],
+                    "sl_candle": config_manager.get("CANDLE_LOOKBACK", 3),
                     "fixed_loss": config_manager.get("POSITION_SIZING")[
                         "DEFAULT_FIXED_LOSS"
                     ],
@@ -100,9 +100,7 @@ class BatchOrderSection:
                 }
             )
         self.refresh_orders_ui()
-        self.update_sl_mode(
-            config_manager.get("SL_MODE").get("DEFAULT_MODE", "FIXED_POINTS")
-        )
+        self.update_sl_mode(config_manager.get("SL_MODE", "FIXED_POINTS"))
         self.update_position_sizing_mode(
             config_manager.get("POSITION_SIZING")["DEFAULT_MODE"]
         )
@@ -221,7 +219,7 @@ class BatchOrderSection:
                 "volume": 0.01,
                 "sl_points": 0,
                 "tp_points": 0,
-                "sl_candle": config_manager.get("SL_MODE")["CANDLE_LOOKBACK"],
+                "sl_candle": config_manager.get("CANDLE_LOOKBACK", 3),
                 "fixed_loss": config_manager.get("POSITION_SIZING")[
                     "DEFAULT_FIXED_LOSS"
                 ],
@@ -230,9 +228,7 @@ class BatchOrderSection:
         )
         self.refresh_orders_ui()
         # 重新应用当前模式设置
-        self.update_sl_mode(
-            config_manager.get("SL_MODE").get("DEFAULT_MODE", "FIXED_POINTS")
-        )
+        self.update_sl_mode(config_manager.get("SL_MODE", "FIXED_POINTS"))
         self.update_position_sizing_mode(
             config_manager.get("POSITION_SIZING")["DEFAULT_MODE"]
         )
@@ -244,9 +240,7 @@ class BatchOrderSection:
         self.orders.pop(idx)
         self.refresh_orders_ui()
         # 重新应用当前模式设置
-        self.update_sl_mode(
-            config_manager.get("SL_MODE").get("DEFAULT_MODE", "FIXED_POINTS")
-        )
+        self.update_sl_mode(config_manager.get("SL_MODE", "FIXED_POINTS"))
         self.update_position_sizing_mode(
             config_manager.get("POSITION_SIZING")["DEFAULT_MODE"]
         )
@@ -290,7 +284,7 @@ class BatchOrderSection:
             point = symbol_info.point
 
             # 根据交易方向和止损模式计算止损价格
-            sl_mode = config_manager.get("SL_MODE").get("DEFAULT_MODE", "FIXED_POINTS")
+            sl_mode = config_manager.get("SL_MODE", "FIXED_POINTS")
             sl_price = 0
 
             if sl_mode == "FIXED_POINTS":
@@ -396,24 +390,25 @@ class BatchOrderSection:
         """实时保存批量订单设置"""
         try:
             # print("正在保存批量订单设置...")
+            
+            # 获取当前的批量订单默认配置
+            batch_defaults = config_manager.get("BATCH_ORDER_DEFAULTS") or {}
+            
             # 只保存volume>0的订单
             valid_count = 0
             for i, order in enumerate(self.orders[: self.MAX_ORDERS]):
                 if order["volume"] <= 0:
                     continue  # 跳过空单
+                    
                 order_key = f"order{valid_count+1}"
-                config_manager.set(
-                    "BATCH_ORDER_DEFAULTS",
-                    order_key,
-                    {
-                        "volume": order["volume"],
-                        "sl_points": order["sl_points"],
-                        "tp_points": order["tp_points"],
-                        "sl_candle": order["sl_candle"],
-                        "fixed_loss": order["fixed_loss"],
-                        "checked": order["checked"],
-                    },
-                )
+                batch_defaults[order_key] = {
+                    "volume": order["volume"],
+                    "sl_points": order["sl_points"],
+                    "tp_points": order["tp_points"],
+                    "sl_candle": order["sl_candle"],
+                    "fixed_loss": order["fixed_loss"],
+                    "checked": order["checked"],
+                }
                 # print(
                 #     f"批量订单{valid_count+1}设置: 手数={order['volume']}, "
                 #     f"止损点数={order['sl_points']}, "
@@ -422,10 +417,16 @@ class BatchOrderSection:
                 #     f"固定亏损={order['fixed_loss']}"
                 # )
                 valid_count += 1
+                
             # 清理多余的orderN
             for i in range(valid_count + 1, self.MAX_ORDERS + 1):
-                config_manager.remove("BATCH_ORDER_DEFAULTS", f"order{i}")
+                order_key = f"order{i}"
+                if order_key in batch_defaults:
+                    del batch_defaults[order_key]
 
+            # 整体保存批量订单配置
+            config_manager.set("BATCH_ORDER_DEFAULTS", batch_defaults)
+            
             # 保存配置到文件
             result = config_manager.save()
             if result:

@@ -23,21 +23,19 @@ class TradingSettingsSection:
         # 交易品种选择
         row1_layout = QHBoxLayout()
         self.symbol_input = QComboBox()
-
-        # 初始时使用配置中的品种，连接成功后会更新
         self.symbol_input.addItems(SYMBOLS)
-
         row1_layout.addWidget(QLabel("交易品种:"))
         row1_layout.addWidget(self.symbol_input)
 
-        # 添加止损模式选择
+        # 止损模式选择（只用 config 的 SL_MODE 字段初始化，切换时实时保存）
         self.sl_mode_combo = QComboBox()
         self.sl_mode_combo.addItems(["固定点数止损", "K线关键位止损"])
-        if SL_MODE.get("DEFAULT_MODE", "FIXED_POINTS") == "FIXED_POINTS":
-            self.sl_mode_combo.setCurrentIndex(0)
-        else:
-            self.sl_mode_combo.setCurrentIndex(1)
+        # 初始化时读取 config
+        from app.config.config_manager import config_manager
 
+        mode = config_manager.get("SL_MODE", "FIXED_POINTS")
+        self.sl_mode_combo.setCurrentIndex(0 if mode == "FIXED_POINTS" else 1)
+        self.sl_mode_combo.currentIndexChanged.connect(self.on_sl_mode_changed)
         row1_layout.addWidget(QLabel("止损模式:"))
         row1_layout.addWidget(self.sl_mode_combo)
 
@@ -88,18 +86,18 @@ class TradingSettingsSection:
 
     def on_sl_mode_changed(self, index):
         """
-        当止损模式改变时更新UI和参数
-
-        Args:
-            index: 选择的索引，0表示固定点数止损，1表示K线关键位止损
+        当止损模式改变时，保存到 config
         """
-        # 保存当前选择的止损模式
-        SL_MODE["DEFAULT_MODE"] = "FIXED_POINTS" if index == 0 else "CANDLE_KEY_LEVEL"
+        from app.config.config_manager import config_manager
 
+        mode = "FIXED_POINTS" if index == 0 else "CANDLE_KEY_LEVEL"
+        config_manager.set("SL_MODE", mode)
+        config_manager.save()
         # 通知批量下单设置更新UI
         from app.gui.batch_order import update_sl_mode
 
-        return SL_MODE.get("DEFAULT_MODE", "FIXED_POINTS")
+        update_sl_mode(mode)
+        return mode
 
     def on_position_sizing_changed(self, index):
         """

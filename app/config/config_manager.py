@@ -42,9 +42,7 @@ class ConfigManager:
             },
             dict,
         )
-        self.register(
-            "SL_MODE", {"DEFAULT_MODE": "CANDLE_KEY_LEVEL", "CANDLE_LOOKBACK": 3}, dict
-        )
+        self.register("SL_MODE", "FIXED_POINTS", str)
         self.register(
             "BREAKOUT_SETTINGS",
             {
@@ -94,9 +92,10 @@ class ConfigManager:
         )
         self.register(
             "POSITION_SIZING",
-            {"DEFAULT_MODE": "FIXED_LOSS", "DEFAULT_FIXED_LOSS": 15.0},
+            {"DEFAULT_MODE": "FIXED_LOSS"},
             dict,
         )
+        self.register("CANDLE_LOOKBACK", 3, int)
         self._load()
 
     def _default_config_path(self):

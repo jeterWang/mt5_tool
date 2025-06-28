@@ -1,14 +1,15 @@
 {
     "SYMBOLS": [
-        "USTECm",
+        "BTCUSDm",
         "XAUUSDm",
-        "NAS100"
+        "NAS100",
+        "USTECm"
     ],
     "DEFAULT_TIMEFRAME": "M1",
     "Delta_TIMEZONE": 0,
     "TRADING_DAY_RESET_HOUR": 20,
     "DAILY_LOSS_LIMIT": 100.0,
-    "DAILY_TRADE_LIMIT": 10,
+    "DAILY_TRADE_LIMIT": 20,
     "GUI_SETTINGS": {
         "WINDOW_TOP": true,
         "SOUND_ALERT": true,
@@ -17,14 +18,11 @@
         "BEEP_DURATION": 200,
         "BREAKEVEN_OFFSET_POINTS": 100
     },
-    "SL_MODE": {
-        "DEFAULT_MODE": "CANDLE_KEY_LEVEL",
-        "CANDLE_LOOKBACK": 3
-    },
+    "SL_MODE": "CANDLE_KEY_LEVEL",
     "BREAKOUT_SETTINGS": {
-        "HIGH_OFFSET_POINTS": 10,
-        "LOW_OFFSET_POINTS": 10,
-        "SL_OFFSET_POINTS": 100
+        "HIGH_OFFSET_POINTS": 0,
+        "LOW_OFFSET_POINTS": 0,
+        "SL_OFFSET_POINTS": 0
     },
     "BATCH_ORDER_DEFAULTS": {
         "order1": {
@@ -32,7 +30,7 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "fixed_loss": 5.0,
+            "fixed_loss": 7.0,
             "checked": true
         },
         "order2": {
@@ -40,7 +38,7 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "fixed_loss": 5.0,
+            "fixed_loss": 7.0,
             "checked": true
         },
         "order3": {
@@ -48,7 +46,7 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "fixed_loss": 5.0,
+            "fixed_loss": 7.0,
             "checked": true
         },
         "order4": {
@@ -56,8 +54,8 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "fixed_loss": 5.0,
-            "checked": false
+            "fixed_loss": 7.0,
+            "checked": true
         }
     },
     "POSITION_SIZING": {

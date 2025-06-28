@@ -209,22 +209,6 @@ class SettingsDialog(QDialog):
         self.trade_limit_spin.setValue(config_manager.get("DAILY_TRADE_LIMIT"))
         risk_layout.addWidget(QLabel("每日最大交易次数:"))
         risk_layout.addWidget(self.trade_limit_spin)
-        # 止损模式
-        sl_group = QGroupBox("止损模式")
-        sl_layout = QHBoxLayout(sl_group)
-        sl_mode = config_manager.get("SL_MODE")
-        self.sl_mode_combo = QComboBox()
-        self.sl_mode_combo.addItems(["固定点数", "关键K线"])
-        self.sl_mode_combo.setCurrentIndex(
-            0 if sl_mode.get("DEFAULT_MODE", "FIXED_POINTS") == "FIXED_POINTS" else 1
-        )
-        sl_layout.addWidget(QLabel("默认止损模式:"))
-        sl_layout.addWidget(self.sl_mode_combo)
-        self.candle_lookback_spin = QSpinBox()
-        self.candle_lookback_spin.setRange(1, 20)
-        self.candle_lookback_spin.setValue(sl_mode["CANDLE_LOOKBACK"])
-        sl_layout.addWidget(QLabel("K线回溯数:"))
-        sl_layout.addWidget(self.candle_lookback_spin)
         # 突破设置
         breakout_group = QGroupBox("突破设置")
         breakout_layout = QVBoxLayout(breakout_group)
@@ -252,7 +236,6 @@ class SettingsDialog(QDialog):
         breakout_layout.addLayout(sl_offset_layout)
         # 添加所有组件到布局
         layout.addWidget(risk_group)
-        layout.addWidget(sl_group)
         layout.addWidget(breakout_group)
         # 添加到标签页
         self.tab_widget.addTab(trading_tab, "交易设置")
@@ -361,14 +344,6 @@ class SettingsDialog(QDialog):
             gui_settings["BREAKEVEN_OFFSET_POINTS"] = self.breakeven_offset_spin.value()
             config_manager.set("GUI_SETTINGS", gui_settings)
             # 3. 交易设置
-            sl_mode = config_manager.get("SL_MODE")
-            sl_mode["DEFAULT_MODE"] = (
-                "FIXED_POINTS"
-                if self.sl_mode_combo.currentIndex() == 0
-                else "CANDLE_KEY_LEVEL"
-            )
-            sl_mode["CANDLE_LOOKBACK"] = self.candle_lookback_spin.value()
-            config_manager.set("SL_MODE", sl_mode)
             breakout_settings = config_manager.get("BREAKOUT_SETTINGS")
             breakout_settings["HIGH_OFFSET_POINTS"] = self.high_offset_spin.value()
             breakout_settings["LOW_OFFSET_POINTS"] = self.low_offset_spin.value()
