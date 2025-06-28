@@ -8,7 +8,7 @@
     "DEFAULT_TIMEFRAME": "M1",
     "Delta_TIMEZONE": 0,
     "TRADING_DAY_RESET_HOUR": 20,
-    "DAILY_LOSS_LIMIT": 100.0,
+    "DAILY_LOSS_LIMIT": 10000.0,
     "DAILY_TRADE_LIMIT": 20,
     "GUI_SETTINGS": {
         "WINDOW_TOP": true,
@@ -38,7 +38,7 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "fixed_loss": 7.0,
+            "fixed_loss": 3.0,
             "checked": true
         },
         "order3": {
@@ -46,7 +46,7 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "fixed_loss": 7.0,
+            "fixed_loss": 3.0,
             "checked": true
         },
         "order4": {
@@ -54,7 +54,7 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "fixed_loss": 7.0,
+            "fixed_loss": 3.0,
             "checked": true
         }
     },
