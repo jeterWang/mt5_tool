@@ -57,10 +57,11 @@ class PlaceBatchOrderCommand(BaseCommand):
                 batch_entry_price = tick.ask if self.order_type == "buy" else tick.bid
                 sl_points = checked_orders[0]["sl_points"]
                 point = mt5.symbol_info(symbol).point
+                spread = tick.ask - tick.bid
                 if self.order_type == "buy":
                     sl_price = batch_entry_price - sl_points * point
                 else:
-                    sl_price = batch_entry_price + sl_points * point
+                    sl_price = batch_entry_price + sl_points * point + spread
             else:
                 countdown = self.gui_window.components.get("countdown")
                 if not countdown:
@@ -82,12 +83,14 @@ class PlaceBatchOrderCommand(BaseCommand):
                     )
                     * mt5.symbol_info(symbol).point
                 )
+                tick = mt5.symbol_info_tick(symbol)
+                spread = tick.ask - tick.bid if tick else 0
                 if self.order_type == "buy":
                     sl_price = lowest_point - sl_offset
-                    batch_entry_price = mt5.symbol_info_tick(symbol).ask
+                    batch_entry_price = tick.ask if tick else 0
                 else:
-                    sl_price = highest_point + sl_offset
-                    batch_entry_price = mt5.symbol_info_tick(symbol).bid
+                    sl_price = highest_point + sl_offset + spread
+                    batch_entry_price = tick.bid if tick else 0
             if has_positions:
                 breakeven_volume = calculate_breakeven_position_size(
                     self.trader,
@@ -129,7 +132,15 @@ class PlaceBatchOrderCommand(BaseCommand):
                     volume = calculated_volume
                 elif volume <= 0:
                     continue
+                tick = mt5.symbol_info_tick(symbol)
+                spread = tick.ask - tick.bid if tick else 0
                 if sl_mode == "FIXED_POINTS":
+                    if self.order_type == "buy":
+                        sl_price = batch_entry_price - order["sl_points"] * point
+                    else:
+                        sl_price = (
+                            batch_entry_price + order["sl_points"] * point + spread
+                        )
                     mt5_order = self.trader.place_order_with_tp_sl(
                         symbol=symbol,
                         order_type=self.order_type,
@@ -152,10 +163,12 @@ class PlaceBatchOrderCommand(BaseCommand):
                         return
                     lowest_point = min([rate["low"] for rate in rates[2:]])
                     highest_point = max([rate["high"] for rate in rates[2:]])
+                    tick = mt5.symbol_info_tick(symbol)
+                    spread = tick.ask - tick.bid if tick else 0
                     if self.order_type == "buy":
                         sl_price = lowest_point - sl_offset
                     else:
-                        sl_price = highest_point + sl_offset
+                        sl_price = highest_point + sl_offset + spread
                     mt5_order = self.trader.place_order_with_key_level_sl(
                         symbol=symbol,
                         order_type=self.order_type,

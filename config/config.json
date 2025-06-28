@@ -9,7 +9,7 @@
     "Delta_TIMEZONE": 0,
     "TRADING_DAY_RESET_HOUR": 20,
     "DAILY_LOSS_LIMIT": 10000.0,
-    "DAILY_TRADE_LIMIT": 20,
+    "DAILY_TRADE_LIMIT": 200,
     "GUI_SETTINGS": {
         "WINDOW_TOP": true,
         "SOUND_ALERT": true,

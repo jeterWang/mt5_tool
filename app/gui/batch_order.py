@@ -283,6 +283,10 @@ class BatchOrderSection:
 
             point = symbol_info.point
 
+            # 获取点差spread，行情异常时为0
+            tick = mt5.symbol_info_tick(symbol)
+            spread = tick.ask - tick.bid if tick and tick.ask and tick.bid else 0
+
             # 根据交易方向和止损模式计算止损价格
             sl_mode = config_manager.get("SL_MODE", "FIXED_POINTS")
             sl_price = 0
@@ -294,8 +298,8 @@ class BatchOrderSection:
                         # 买入订单，止损在入场价下方
                         sl_price = entry_price - sl_points * point
                     else:  # sell
-                        # 卖出订单，止损在入场价上方
-                        sl_price = entry_price + sl_points * point
+                        # 卖出订单，止损在入场价上方，加点差
+                        sl_price = entry_price + sl_points * point + spread
             else:
                 # K线关键位模式，需要获取K线数据
                 from app.gui.main_window import get_current_trader_and_window
@@ -314,7 +318,6 @@ class BatchOrderSection:
                         if rates is not None and len(rates) >= lookback + 2:
                             lowest_point = min([rate["low"] for rate in rates[2:]])
                             highest_point = max([rate["high"] for rate in rates[2:]])
-                            # 添加偏移
                             from config.loader import BREAKOUT_SETTINGS
 
                             sl_offset = BREAKOUT_SETTINGS["SL_OFFSET_POINTS"] * point
@@ -322,7 +325,7 @@ class BatchOrderSection:
                             if order_type == "buy":
                                 sl_price = lowest_point - sl_offset
                             else:  # sell
-                                sl_price = highest_point + sl_offset
+                                sl_price = highest_point + sl_offset + spread
 
             if sl_price <= 0:
                 return 0
@@ -390,16 +393,16 @@ class BatchOrderSection:
         """实时保存批量订单设置"""
         try:
             # print("正在保存批量订单设置...")
-            
+
             # 获取当前的批量订单默认配置
             batch_defaults = config_manager.get("BATCH_ORDER_DEFAULTS") or {}
-            
+
             # 只保存volume>0的订单
             valid_count = 0
             for i, order in enumerate(self.orders[: self.MAX_ORDERS]):
                 if order["volume"] <= 0:
                     continue  # 跳过空单
-                    
+
                 order_key = f"order{valid_count+1}"
                 batch_defaults[order_key] = {
                     "volume": order["volume"],
@@ -417,7 +420,7 @@ class BatchOrderSection:
                 #     f"固定亏损={order['fixed_loss']}"
                 # )
                 valid_count += 1
-                
+
             # 清理多余的orderN
             for i in range(valid_count + 1, self.MAX_ORDERS + 1):
                 order_key = f"order{i}"
@@ -426,7 +429,7 @@ class BatchOrderSection:
 
             # 整体保存批量订单配置
             config_manager.set("BATCH_ORDER_DEFAULTS", batch_defaults)
-            
+
             # 保存配置到文件
             result = config_manager.save()
             if result:

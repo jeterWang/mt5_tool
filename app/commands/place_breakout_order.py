@@ -69,6 +69,8 @@ class PlaceBreakoutOrderCommand(BaseCommand):
                 order_type = "buy_stop"
                 comment_prefix = f"{timeframe}高点突破买入"
             else:
+                tick = mt5.symbol_info_tick(symbol)
+                spread = tick.ask - tick.bid if tick else 0
                 entry_price = previous_low - low_offset * point
                 order_type = "sell_stop"
                 comment_prefix = f"{timeframe}低点突破卖出"
@@ -87,13 +89,15 @@ class PlaceBreakoutOrderCommand(BaseCommand):
                         )
                     else:
                         sl_price = (
-                            entry_price + batch_order.orders[0]["sl_points"] * point
+                            entry_price
+                            + batch_order.orders[0]["sl_points"] * point
+                            + spread
                         )
                 else:
                     if self.breakout_type == "high":
                         sl_price = previous_low - sl_offset * point
                     else:
-                        sl_price = previous_high + sl_offset * point
+                        sl_price = previous_high + sl_offset * point + spread
                 breakeven_volume = calculate_breakeven_position_size(
                     self.trader,
                     symbol,
@@ -134,12 +138,12 @@ class PlaceBreakoutOrderCommand(BaseCommand):
                     if self.breakout_type == "high":
                         sl_price = entry_price - order["sl_points"] * point
                     else:
-                        sl_price = entry_price + order["sl_points"] * point
+                        sl_price = entry_price + order["sl_points"] * point + spread
                 else:
                     if self.breakout_type == "high":
                         sl_price = previous_low - sl_offset * point
                     else:
-                        sl_price = previous_high + sl_offset * point
+                        sl_price = previous_high + sl_offset * point + spread
                 mt5_order = self.trader.place_pending_order(
                     symbol=symbol,
                     order_type=order_type,
