@@ -6,6 +6,7 @@ MT5交易核心模块
 
 import MetaTrader5 as mt5
 import logging
+
 logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta
 import os
@@ -236,4 +237,34 @@ class MT5Trader:
             return [p._asdict() for p in positions if p.type == mt5_type]
         except Exception as e:
             # print(f"获取指定品种和方向持仓出错：{str(e)}")
+            return []
+
+    def get_all_pending_orders(self) -> list:
+        """
+        获取所有挂单信息，结构与持仓兼容，增加status字段
+        Returns:
+            挂单信息列表
+        """
+        if not self.connected:
+            return []
+        try:
+            orders = mt5.orders_get()
+            if orders is None:
+                return []
+            result = []
+            for order in orders:
+                d = order._asdict()
+                d["status"] = "挂单"
+                # 字段兼容处理
+                d.setdefault("profit", "-")
+                d.setdefault("price_open", d.get("price_open", d.get("price", "-")))
+                d.setdefault(
+                    "volume", d.get("volume_current", d.get("volume_initial", 0))
+                )
+                d.setdefault("type", d.get("type", "-"))
+                d.setdefault("ticket", d.get("ticket", "-"))
+                d.setdefault("symbol", d.get("symbol", "-"))
+                result.append(d)
+            return result
+        except Exception as e:
             return []

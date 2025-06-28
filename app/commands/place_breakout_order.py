@@ -140,10 +140,28 @@ class PlaceBreakoutOrderCommand(BaseCommand):
                     else:
                         sl_price = entry_price + order["sl_points"] * point + spread
                 else:
+                    lookback = order.get("sl_candle", 1)
+                    rates = get_valid_rates(
+                        symbol,
+                        get_timeframe(timeframe),
+                        lookback + 2,
+                        self.gui_window,
+                    )
+                    if rates is None or len(rates) < 3:
+                        logging.error(f"突破订单{i+1}：K线数据获取失败，跳过")
+                        continue
+                    lowest_point = min([rate["low"] for rate in rates[2:]])
+                    highest_point = max([rate["high"] for rate in rates[2:]])
+                    sl_offset_points = config_manager.get("BREAKEVEN_SETTINGS", {}).get(
+                        "SL_OFFSET_POINTS", 0
+                    )
+                    sl_offset = sl_offset_points * point
+                    tick = mt5.symbol_info_tick(symbol)
+                    spread = tick.ask - tick.bid if tick else 0
                     if self.breakout_type == "high":
-                        sl_price = previous_low - sl_offset * point
+                        sl_price = lowest_point - sl_offset
                     else:
-                        sl_price = previous_high + sl_offset * point + spread
+                        sl_price = highest_point + sl_offset + spread
                 mt5_order = self.trader.place_pending_order(
                     symbol=symbol,
                     order_type=order_type,

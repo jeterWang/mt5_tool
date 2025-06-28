@@ -37,48 +37,70 @@ class PositionsTableSection:
 
     def update_positions(self, trader, gui_window):
         """
-        更新持仓信息
-
-        Args:
-            trader: 交易者对象
-            gui_window: 主窗口对象，用于获取状态栏
+        更新持仓信息（合并持仓和挂单）
         """
         try:
-            positions = trader.get_all_positions()
-            if positions is None:
-                return
-
-            self.positions_table.setRowCount(len(positions))
-            for i, position in enumerate(positions):
+            positions = trader.get_all_positions() or []
+            for p in positions:
+                p["status"] = "持仓"
+            pendings = (
+                trader.get_all_pending_orders()
+                if hasattr(trader, "get_all_pending_orders")
+                else []
+            )
+            all_orders = positions + pendings
+            self.positions_table.setRowCount(len(all_orders))
+            for i, order in enumerate(all_orders):
                 self.positions_table.setItem(
-                    i, 0, QTableWidgetItem(str(position["ticket"]))
-                )
-                self.positions_table.setItem(i, 1, QTableWidgetItem(position["symbol"]))
-                self.positions_table.setItem(
-                    i,
-                    2,
-                    QTableWidgetItem(
-                        "买入" if position["type"] == mt5.POSITION_TYPE_BUY else "卖出"
-                    ),
+                    i, 0, QTableWidgetItem(str(order.get("ticket", "-")))
                 )
                 self.positions_table.setItem(
-                    i, 3, QTableWidgetItem(str(position["volume"]))
+                    i, 1, QTableWidgetItem(order.get("symbol", "-"))
+                )
+                # 类型字段：持仓-买入/卖出，挂单-买入/卖出
+                if order.get("status") == "挂单":
+                    order_type = order.get("type", "-")
+                    if order_type in [mt5.ORDER_TYPE_BUY, mt5.ORDER_TYPE_BUY_STOP]:
+                        type_str = "挂单-买入"
+                    elif order_type in [mt5.ORDER_TYPE_SELL, mt5.ORDER_TYPE_SELL_STOP]:
+                        type_str = "挂单-卖出"
+                    else:
+                        type_str = "挂单"
+                else:
+                    order_type = order.get("type", "-")
+                    if order_type == mt5.POSITION_TYPE_BUY:
+                        type_str = "持仓-买入"
+                    elif order_type == mt5.POSITION_TYPE_SELL:
+                        type_str = "持仓-卖出"
+                    else:
+                        type_str = "持仓"
+                self.positions_table.setItem(i, 2, QTableWidgetItem(type_str))
+                self.positions_table.setItem(
+                    i, 3, QTableWidgetItem(str(order.get("volume", "-")))
                 )
                 self.positions_table.setItem(
-                    i, 4, QTableWidgetItem(str(position["price_open"]))
+                    i, 4, QTableWidgetItem(str(order.get("price_open", "-")))
                 )
                 self.positions_table.setItem(
-                    i, 5, QTableWidgetItem(str(position["profit"]))
+                    i, 5, QTableWidgetItem(str(order.get("profit", "-")))
                 )
-
-                # 添加平仓按钮
-                close_btn = QPushButton("平仓")
-                close_btn.clicked.connect(
-                    lambda checked, ticket=position["ticket"]: self.close_position(
-                        ticket, trader, gui_window
+                # 操作按钮
+                if order.get("status") == "挂单":
+                    cancel_btn = QPushButton("撤单")
+                    cancel_btn.clicked.connect(
+                        lambda checked, ticket=order.get("ticket"): self.cancel_order(
+                            ticket, trader, gui_window
+                        )
                     )
-                )
-                self.positions_table.setCellWidget(i, 6, close_btn)
+                    self.positions_table.setCellWidget(i, 6, cancel_btn)
+                else:
+                    close_btn = QPushButton("平仓")
+                    close_btn.clicked.connect(
+                        lambda checked, ticket=order.get("ticket"): self.close_position(
+                            ticket, trader, gui_window
+                        )
+                    )
+                    self.positions_table.setCellWidget(i, 6, close_btn)
         except Exception as e:
             pass
             # print(f"更新持仓信息出错：{str(e)}")
@@ -99,3 +121,15 @@ class PositionsTableSection:
                 gui_window.status_bar.showMessage(f"订单 {ticket} 平仓失败！")
         except Exception as e:
             gui_window.status_bar.showMessage(f"平仓出错：{str(e)}")
+
+    def cancel_order(self, ticket, trader, gui_window):
+        """
+        撤销指定挂单
+        """
+        try:
+            if trader.cancel_order(ticket):
+                gui_window.status_bar.showMessage(f"挂单 {ticket} 撤销成功！")
+            else:
+                gui_window.status_bar.showMessage(f"挂单 {ticket} 撤销失败！")
+        except Exception as e:
+            gui_window.status_bar.showMessage(f"撤销挂单出错：{str(e)}")
