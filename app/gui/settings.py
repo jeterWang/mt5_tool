@@ -68,7 +68,8 @@ class SettingsDialog(QDialog):
         self.create_basic_tab()
         self.create_gui_tab()
         self.create_trading_tab()
-        self.create_batch_order_tab()
+        # 移除批量下单标签页 - 统一在主界面配置
+        # self.create_batch_order_tab()
         self.create_advanced_tab()
 
         # 添加保存和取消按钮
@@ -245,9 +246,9 @@ class SettingsDialog(QDialog):
         batch_tab = QGroupBox("批量下单设置")
         layout = QVBoxLayout(batch_tab)
         batch_defaults = config_manager.get("BATCH_ORDER_DEFAULTS")
-        self.batch_table = QTableWidget(4, 5)  # 增加为5列，添加sl_candle列
+        self.batch_table = QTableWidget(4, 6)  # 增加为6列，添加fixed_loss列
         self.batch_table.setHorizontalHeaderLabels(
-            ["订单", "手数", "止损点数", "止盈点数", "K线回溯数"]
+            ["订单", "手数", "止损点数", "止盈点数", "K线回溯数", "亏损($)"]
         )
         self.batch_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -274,6 +275,11 @@ class SettingsDialog(QDialog):
             sl_candle_spin.setRange(1, 20)
             sl_candle_spin.setValue(order_data.get("sl_candle", 3))
             self.batch_table.setCellWidget(i, 4, sl_candle_spin)
+            fixed_loss_spin = QDoubleSpinBox()
+            fixed_loss_spin.setRange(0.01, 10000)
+            fixed_loss_spin.setSingleStep(0.01)
+            fixed_loss_spin.setValue(order_data.get("fixed_loss", 5.0))
+            self.batch_table.setCellWidget(i, 5, fixed_loss_spin)
         layout.addWidget(self.batch_table)
         # 添加到标签页
         self.tab_widget.addTab(batch_tab, "批量下单")
@@ -352,25 +358,14 @@ class SettingsDialog(QDialog):
             # 4. 风控设置
             config_manager.set("DAILY_LOSS_LIMIT", self.loss_limit_spin.value())
             config_manager.set("DAILY_TRADE_LIMIT", self.trade_limit_spin.value())
-            # 5. 批量下单设置
-            batch_defaults = config_manager.get("BATCH_ORDER_DEFAULTS")
-            for i in range(4):
-                order_key = f"order{i+1}"
-                volume_spin = self.batch_table.cellWidget(i, 1)
-                sl_spin = self.batch_table.cellWidget(i, 2)
-                tp_spin = self.batch_table.cellWidget(i, 3)
-                sl_candle_spin = self.batch_table.cellWidget(i, 4)
-                batch_defaults[order_key] = {
-                    "volume": volume_spin.value(),
-                    "sl_points": sl_spin.value(),
-                    "tp_points": tp_spin.value(),
-                    "sl_candle": sl_candle_spin.value(),
-                    "fixed_loss": batch_defaults[order_key].get("fixed_loss", 5.0),
-                    "checked": batch_defaults[order_key].get("checked", True),
-                }
-            config_manager.set("BATCH_ORDER_DEFAULTS", batch_defaults)
+            # 5. 批量下单设置 - 已移除，统一在主界面管理
+            # 批量下单配置现在完全由主界面的批量下单组件管理
+            # 避免两个地方配置同一个设置造成混淆
             # 保存到文件
+            print("[Settings] 开始保存配置...")
             success = config_manager.save()
+            print(f"[Settings] 保存结果: {success}")
+
             if success:
                 QMessageBox.information(self, "保存成功", "设置已成功保存")
                 self.accept()

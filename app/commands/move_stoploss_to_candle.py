@@ -8,6 +8,7 @@ from app.utils.trade_helpers import (
 )
 import MetaTrader5 as mt5
 import logging
+from app.config.config_manager import config_manager
 
 
 class MoveStoplossToCandleCommand(BaseCommand):
@@ -43,10 +44,20 @@ class MoveStoplossToCandleCommand(BaseCommand):
                     details.append(f"{symbol}订单{position_id}获取K线失败")
                     continue
                 prev_candle = rates[1]
+                # 获取最新tick数据以计算点差
+                tick = mt5.symbol_info_tick(symbol)
+                spread = (
+                    (tick.ask - tick.bid) if tick and tick.ask and tick.bid else None
+                )
                 if pos_type == mt5.POSITION_TYPE_BUY:
                     new_sl = prev_candle["low"]
                 else:
-                    new_sl = prev_candle["high"]
+                    # 空单止损价应为K线high+点差，防止止损失效
+                    if spread is None:
+                        failed_positions.append(position_id)
+                        details.append(f"{symbol}订单{position_id}获取点差失败")
+                        continue
+                    new_sl = prev_candle["high"] + spread
                 if self.trader.modify_position_sl_tp(position_id, sl=new_sl, tp=None):
                     success_count += 1
                     modified_positions.append(position_id)
@@ -59,7 +70,7 @@ class MoveStoplossToCandleCommand(BaseCommand):
                 if failed_positions:
                     message += f"\n失败订单: {', '.join(map(str, failed_positions))}"
                 show_status_message(self.gui_window, message)
-                play_trade_beep(self.gui_window.config_manager)
+                play_trade_beep(config_manager)
             else:
                 show_status_message(self.gui_window, "所有持仓止损移动失败！")
         except Exception as e:

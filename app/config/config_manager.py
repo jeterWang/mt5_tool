@@ -112,10 +112,23 @@ class ConfigManager:
         self._load()
 
     def _default_config_path(self):
-        project_root = os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        )
-        return os.path.join(project_root, "config", "config.json")
+        import sys
+
+        # 如果是打包后的exe，使用exe同级目录
+        if getattr(sys, 'frozen', False):
+            # 打包后的exe环境
+            exe_dir = os.path.dirname(sys.executable)
+            config_path = os.path.join(exe_dir, "config", "config.json")
+            print(f"[ConfigManager] 打包环境，配置路径: {config_path}")
+            return config_path
+        else:
+            # 开发环境
+            project_root = os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            )
+            config_path = os.path.join(project_root, "config", "config.json")
+            print(f"[ConfigManager] 开发环境，配置路径: {config_path}")
+            return config_path
 
     def register(self, key, default, typ):
         self._defaults[key] = default
@@ -136,11 +149,24 @@ class ConfigManager:
 
     def save(self):
         try:
+            print(f"[ConfigManager] 正在保存配置到: {self._config_path}")
+            print(f"[ConfigManager] 配置数据: {self._data}")
+
+            # 确保目录存在
+            config_dir = os.path.dirname(self._config_path)
+            if not os.path.exists(config_dir):
+                os.makedirs(config_dir, exist_ok=True)
+                print(f"[ConfigManager] 创建配置目录: {config_dir}")
+
             with open(self._config_path, "w", encoding="utf-8") as f:
                 json.dump(self._data, f, indent=4, ensure_ascii=False)
+
+            print(f"[ConfigManager] 配置保存成功")
             return True
         except Exception as e:
             print(f"[ConfigManager] 保存配置失败: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def _load(self):

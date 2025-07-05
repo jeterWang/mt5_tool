@@ -78,7 +78,7 @@ class PlaceBatchOrderCommand(BaseCommand):
                 lowest_point = min([rate["low"] for rate in rates[2:]])
                 highest_point = max([rate["high"] for rate in rates[2:]])
                 sl_offset = (
-                    config_manager.get("BREAKEVEN_SETTINGS", {}).get(
+                    config_manager.get("BREAKOUT_SETTINGS", {}).get(
                         "SL_OFFSET_POINTS", 0
                     )
                     * mt5.symbol_info(symbol).point
@@ -128,6 +128,10 @@ class PlaceBatchOrderCommand(BaseCommand):
                     )
                     if calculated_volume <= 0:
                         logging.error(f"订单{i+1}：仓位计算失败，跳过")
+                        logging.error(f"调试信息 - 订单参数: {order}")
+                        logging.error(f"调试信息 - 入场价格: {entry_price}")
+                        logging.error(f"调试信息 - 交易品种: {symbol}")
+                        logging.error(f"调试信息 - 固定损失: {order.get('fixed_loss', 0)}")
                         continue
                     volume = calculated_volume
                 elif volume <= 0:

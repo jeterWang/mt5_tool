@@ -585,8 +585,7 @@ class MT5GUI(QMainWindow):
         # 检查是否真的更新了
         if "file_limit" in locals() and file_limit != updated_limit:
             logger.warning(
-                "[空日志]",
-                f"警告: 文件中的值({file_limit})与更新后内存中的值({updated_limit})不一致!",
+                f"警告: 文件中的值({file_limit})与更新后内存中的值({updated_limit})不一致!"
             )
 
         # 立即更新界面显示

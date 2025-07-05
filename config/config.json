@@ -20,9 +20,9 @@
     },
     "SL_MODE": "CANDLE_KEY_LEVEL",
     "BREAKOUT_SETTINGS": {
-        "HIGH_OFFSET_POINTS": 0,
-        "LOW_OFFSET_POINTS": 0,
-        "SL_OFFSET_POINTS": 0
+        "HIGH_OFFSET_POINTS": 3000,
+        "LOW_OFFSET_POINTS": 3000,
+        "SL_OFFSET_POINTS": 100
     },
     "BATCH_ORDER_DEFAULTS": {
         "order1": {
@@ -30,7 +30,7 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "fixed_loss": 3.0,
+            "fixed_loss": 8.0,
             "checked": true
         },
         "order2": {
@@ -38,7 +38,7 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "fixed_loss": 3.0,
+            "fixed_loss": 8.0,
             "checked": true
         },
         "order3": {
@@ -46,7 +46,7 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "fixed_loss": 3.0,
+            "fixed_loss": 8.0,
             "checked": true
         },
         "order4": {
@@ -54,7 +54,7 @@
             "sl_points": 3000,
             "tp_points": 50000,
             "sl_candle": 3,
-            "fixed_loss": 3.0,
+            "fixed_loss": 8.0,
             "checked": true
         }
     },

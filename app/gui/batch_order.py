@@ -35,7 +35,7 @@ class BatchOrderSection:
         global _instance
         _instance = self
 
-        self.group_box = QGroupBox("批量下单设置")
+        self.group_box = QGroupBox("批量下单设置 (配置会自动保存)")
         self.layout = QVBoxLayout()
         self.group_box.setLayout(self.layout)
 
@@ -140,7 +140,7 @@ class BatchOrderSection:
             volume_input.setSingleStep(0.01)
             volume_input.setValue(order["volume"])
             volume_input.valueChanged.connect(
-                lambda val, i=idx: self.on_value_changed(i, "volume", val)
+                self.make_value_changed_slot(idx, "volume")
             )
             row_layout.addWidget(volume_input)
 
@@ -152,7 +152,7 @@ class BatchOrderSection:
             fixed_loss_input.setSingleStep(1.0)
             fixed_loss_input.setValue(order["fixed_loss"])
             fixed_loss_input.valueChanged.connect(
-                lambda val, i=idx: self.on_value_changed(i, "fixed_loss", val)
+                self.make_value_changed_slot(idx, "fixed_loss")
             )
             row_layout.addWidget(fixed_loss_input)
 
@@ -163,7 +163,7 @@ class BatchOrderSection:
             sl_points_input.setRange(0, 100000)
             sl_points_input.setValue(order["sl_points"])
             sl_points_input.valueChanged.connect(
-                lambda val, i=idx: self.on_value_changed(i, "sl_points", val)
+                self.make_value_changed_slot(idx, "sl_points")
             )
             row_layout.addWidget(sl_points_input)
 
@@ -171,7 +171,7 @@ class BatchOrderSection:
             sl_candle_input.setRange(1, 20)
             sl_candle_input.setValue(order["sl_candle"])
             sl_candle_input.valueChanged.connect(
-                lambda val, i=idx: self.on_value_changed(i, "sl_candle", val)
+                self.make_value_changed_slot(idx, "sl_candle")
             )
             sl_candle_input.setVisible(False)
             row_layout.addWidget(sl_candle_input)
@@ -182,7 +182,7 @@ class BatchOrderSection:
             tp_points_input.setRange(0, 100000)
             tp_points_input.setValue(order["tp_points"])
             tp_points_input.valueChanged.connect(
-                lambda val, i=idx: self.on_value_changed(i, "tp_points", val)
+                self.make_value_changed_slot(idx, "tp_points")
             )
             row_layout.addWidget(tp_points_input)
 
@@ -191,7 +191,7 @@ class BatchOrderSection:
             del_btn.setStyleSheet(
                 "QPushButton { background-color: #e74c3c; color: white; font-weight: bold; border: none; } QPushButton:hover { background-color: #c0392b; color: white; border: none; }"
             )
-            del_btn.clicked.connect(lambda _, i=idx: self.delete_order(i))
+            del_btn.clicked.connect(self.make_delete_slot(idx))
             row_layout.addWidget(del_btn)
 
             self.layout.addWidget(row_widget)
@@ -251,7 +251,8 @@ class BatchOrderSection:
         self.save_batch_settings()
 
     def on_value_changed(self, idx, key, value):
-        self.orders[idx][key] = value
+        if idx < len(self.orders):
+            self.orders[idx][key] = value
         # 固定亏损模式下，手数在下单时计算，这里不预先计算
         # 盈亏平衡批量加仓时，参数变动后可在界面上提示用户"手数将在下单时自动计算"
         self.save_batch_settings()
@@ -273,12 +274,22 @@ class BatchOrderSection:
         """
         try:
             import MetaTrader5 as mt5
+            import logging
+            from app.config.config_manager import config_manager
 
             order = self.orders[order_idx]
             fixed_loss = order["fixed_loss"]
 
+            logging.info(f"开始计算仓位 - 订单{order_idx+1}")
+            logging.info(f"订单参数: {order}")
+            logging.info(f"固定损失: {fixed_loss}")
+            logging.info(f"交易类型: {order_type}")
+            logging.info(f"入场价格: {entry_price}")
+            logging.info(f"交易品种: {symbol}")
+
             symbol_info = mt5.symbol_info(symbol)
             if not symbol_info:
+                logging.error(f"无法获取{symbol}品种信息")
                 return 0
 
             point = symbol_info.point
@@ -318,9 +329,9 @@ class BatchOrderSection:
                         if rates is not None and len(rates) >= lookback + 2:
                             lowest_point = min([rate["low"] for rate in rates[2:]])
                             highest_point = max([rate["high"] for rate in rates[2:]])
-                            from config.loader import BREAKOUT_SETTINGS
+                            from app.config.config_manager import config_manager
 
-                            sl_offset = BREAKOUT_SETTINGS["SL_OFFSET_POINTS"] * point
+                            sl_offset = config_manager.get("BREAKOUT_SETTINGS", {}).get("SL_OFFSET_POINTS", 0) * point
 
                             if order_type == "buy":
                                 sl_price = lowest_point - sl_offset
@@ -368,7 +379,14 @@ class BatchOrderSection:
             return position_size
 
         except Exception as e:
-            # print(f"计算仓位大小出错: {str(e)}")
+            import logging
+            logging.error(f"计算仓位大小出错: {str(e)}")
+            logging.error(f"调试信息 - 订单索引: {order_idx}")
+            logging.error(f"调试信息 - 交易类型: {order_type}")
+            logging.error(f"调试信息 - 入场价格: {entry_price}")
+            logging.error(f"调试信息 - 交易品种: {symbol}")
+            if order_idx < len(self.orders):
+                logging.error(f"调试信息 - 订单参数: {self.orders[order_idx]}")
             return 0
 
     def calculate_position_size(self, order_idx):
@@ -397,13 +415,9 @@ class BatchOrderSection:
             # 获取当前的批量订单默认配置
             batch_defaults = config_manager.get("BATCH_ORDER_DEFAULTS") or {}
 
-            # 只保存volume>0的订单
-            valid_count = 0
+            # 修正：始终保存所有订单（不再跳过volume为0的订单），保证顺序和参数完整
             for i, order in enumerate(self.orders[: self.MAX_ORDERS]):
-                if order["volume"] <= 0:
-                    continue  # 跳过空单
-
-                order_key = f"order{valid_count+1}"
+                order_key = f"order{i+1}"
                 batch_defaults[order_key] = {
                     "volume": order["volume"],
                     "sl_points": order["sl_points"],
@@ -412,17 +426,10 @@ class BatchOrderSection:
                     "fixed_loss": order["fixed_loss"],
                     "checked": order["checked"],
                 }
-                # print(
-                #     f"批量订单{valid_count+1}设置: 手数={order['volume']}, "
-                #     f"止损点数={order['sl_points']}, "
-                #     f"止盈点数={order['tp_points']}, "
-                #     f"K线回溯={order['sl_candle']}, "
-                #     f"固定亏损={order['fixed_loss']}"
-                # )
-                valid_count += 1
+                # 注释：无论volume是否为0，均保存所有订单，避免重启后顺序错乱或数据丢失
 
             # 清理多余的orderN
-            for i in range(valid_count + 1, self.MAX_ORDERS + 1):
+            for i in range(len(self.orders) + 1, self.MAX_ORDERS + 1):
                 order_key = f"order{i}"
                 if order_key in batch_defaults:
                     del batch_defaults[order_key]
@@ -432,60 +439,8 @@ class BatchOrderSection:
 
             # 保存配置到文件
             result = config_manager.save()
-            if result:
-                # print("批量订单设置已成功保存")
-                from config.loader import (
-                    load_config,
-                    BATCH_ORDER_DEFAULTS as updated_defaults,
-                )
-
-                load_config()
-                for i in range(valid_count):
-                    order_key = f"order{i+1}"
-
-                    # 验证所有字段是否正确保存
-                    expected_volume = self.orders[i]["volume"]
-                    actual_volume = updated_defaults[order_key].get("volume")
-                    if abs(expected_volume - actual_volume) > 0.001:
-                        # print(
-                        #     f"警告: {order_key}手数值不一致, UI:{expected_volume}, 内存:{actual_volume}"
-                        # )
-                        self.orders[i]["volume"] = actual_volume
-                    else:
-                        # print(f"{order_key}手数保存成功: {actual_volume}")
-                        pass
-
-                    # 验证fixed_loss字段
-                    expected_fixed_loss = self.orders[i]["fixed_loss"]
-                    actual_fixed_loss = updated_defaults[order_key].get("fixed_loss")
-                    if abs(expected_fixed_loss - actual_fixed_loss) > 0.001:
-                        # print(
-                        #     f"警告: {order_key}固定亏损值不一致, UI:{expected_fixed_loss}, 内存:{actual_fixed_loss}"
-                        # )
-                        self.orders[i]["fixed_loss"] = actual_fixed_loss
-                    else:
-                        # print(f"{order_key}固定亏损保存成功: {actual_fixed_loss}")
-                        pass
-
-                    # 验证其他关键字段
-                    self.orders[i]["sl_points"] = updated_defaults[order_key].get(
-                        "sl_points", self.orders[i]["sl_points"]
-                    )
-                    self.orders[i]["tp_points"] = updated_defaults[order_key].get(
-                        "tp_points", self.orders[i]["tp_points"]
-                    )
-                    self.orders[i]["sl_candle"] = updated_defaults[order_key].get(
-                        "sl_candle", self.orders[i]["sl_candle"]
-                    )
-                    self.orders[i]["checked"] = updated_defaults[order_key].get(
-                        "checked", self.orders[i]["checked"]
-                    )
-            else:
-                pass
-                # print("批量订单设置保存失败")
             return result
         except Exception as e:
-            # print(f"保存批量订单设置失败: {e}")
             return False
 
     def update_sl_mode(self, mode):
@@ -554,7 +509,16 @@ class BatchOrderSection:
     def make_checked_slot(self, idx):
         def slot(state):
             self.on_checked_changed(idx, state)
+        return slot
 
+    def make_value_changed_slot(self, idx, key):
+        def slot(value):
+            self.on_value_changed(idx, key, value)
+        return slot
+
+    def make_delete_slot(self, idx):
+        def slot():
+            self.delete_order(idx)
         return slot
 
     def sync_checked_from_ui(self):

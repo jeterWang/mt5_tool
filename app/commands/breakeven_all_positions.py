@@ -25,8 +25,8 @@ class BreakevenAllPositionsCommand(BaseCommand):
             if len(positions) == 0:
                 show_status_message(self.gui_window, "当前没有持仓！")
                 return
-            offset_points = config_manager.get("BREAKEVEN_SETTINGS", {}).get(
-                "OFFSET_POINTS", 0
+            offset_points = config_manager.get("GUI_SETTINGS", {}).get(
+                "BREAKEVEN_OFFSET_POINTS", 0
             )
             success_count = 0
             failed_positions = []
